@@ -3,10 +3,16 @@
 # Handles fresh systems where nerdctl may not yet be installed.
 
 param(
-    [switch]$RemoveKubeconfig
+    [switch]$RemoveKubeconfig,
+    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
 )
 
-$ErrorActionPreference = "Stop"
+# Load configuration
+if (-not (Test-Path $Config)) {
+    Write-Error "Config file not found: $Config"
+    exit 1
+}
+. $Config
 
 # Invoke a command inside the wslc VM via a bash login shell.
 # Waits until the sentinel string appears in stdout, then kills the process.
@@ -74,16 +80,12 @@ if (-not $nerdctlAvailable) {
 } else {
     Write-Host "nerdctl found. Removing k8s containers and network..." -ForegroundColor Green
 
-    $clusterContainers = @(
-        "k8s-control-plane",
-        "k8s-worker-1",
-        "k8s-worker-2",
-        "k8s-worker-3",
-        "k8s-worker-4",
-        "k8s-api-proxy",
-        "host-local-k8s-proxy",
-        "host-k8s-api-relay"
-    )
+    # Build container list dynamically from config
+    $clusterContainers = @($CONTROL_PLANE_NAME)
+    for ($i = 1; $i -le $WORKER_COUNT; $i++) {
+        $clusterContainers += "${WORKER_NAME_PREFIX}-${i}"
+    }
+    $clusterContainers += @($VM_RELAY_NAME, $HOST_PROXY_NAME)
 
     foreach ($name in $clusterContainers) {
         Write-Host "  Removing container: $name"

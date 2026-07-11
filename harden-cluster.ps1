@@ -1,7 +1,16 @@
 # harden-cluster.ps1
 # Automates the security hardening of the Kubernetes cluster inside the wslc VM.
 
-$PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+param (
+    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
+)
+
+# Load configuration
+if (-not (Test-Path $Config)) {
+    Write-Error "Config file not found: $Config"
+    exit 1
+}
+. $Config
 
 function Invoke-WslcCommand {
     param (

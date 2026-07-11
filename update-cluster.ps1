@@ -1,7 +1,16 @@
 # update-cluster.ps1
 # Automates node OS package updates and prints advice for updating the node base images.
 
-$PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+param (
+    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
+)
+
+# Load configuration
+if (-not (Test-Path $Config)) {
+    Write-Error "Config file not found: $Config"
+    exit 1
+}
+. $Config
 
 function Invoke-WslcCommand {
     param (

@@ -2,11 +2,23 @@
 # Sets up a two-stage local proxy so host kubectl can reach the k8s API server.
 # Uses Sentinel-based wslc command execution to avoid wslc.exe hanging indefinitely.
 
-$ListenAddr = "127.0.0.1"
-$ListenPort = 6443
-$VmRelayPort = 16443
-$HostProxyName = "host-local-k8s-proxy"
-$VmRelayName = "host-k8s-api-relay"
+param (
+    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
+)
+
+# Load configuration
+if (-not (Test-Path $Config)) {
+    Write-Error "Config file not found: $Config"
+    exit 1
+}
+. $Config
+
+# Shorter aliases from config
+$ListenAddr     = $LISTEN_ADDR
+$ListenPort     = $LISTEN_PORT
+$VmRelayPort    = $VM_RELAY_PORT
+$HostProxyName  = $HOST_PROXY_NAME
+$VmRelayName    = $VM_RELAY_NAME
 
 # Invoke a command inside the wslc VM via bash, waiting for a sentinel line.
 function Invoke-WslcCommand {
