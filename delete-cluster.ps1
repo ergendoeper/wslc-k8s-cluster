@@ -92,18 +92,19 @@ if (-not $nerdctlAvailable) {
         Invoke-WslcCommand -Command "nerdctl rm -f '$name' 2>/dev/null || true" -TimeoutSeconds 20
     }
 
-    Invoke-WslcCommand -Command "nerdctl network rm k8s-net 2>/dev/null || true" -TimeoutSeconds 20
-
-    # Verify no k8s containers remain
-    $psOutput = Invoke-WslcCommand -Command "nerdctl ps -a 2>/dev/null" -CaptureOutput $true -TimeoutSeconds 20
-    $remaining = @($psOutput | Where-Object {
-        $_ -match "k8s-control-plane|k8s-worker-|k8s-api-proxy|host-local-k8s-proxy|host-k8s-api-relay"
-    })
-    if ($remaining.Count -gt 0) {
-        throw "Delete incomplete. Remaining k8s containers detected:`n$($remaining -join "`n")"
+    if ($CLUSTER_NETWORK -and $CLUSTER_NETWORK -ne "bridge") {
+        Invoke-WslcCommand -Command "nerdctl network rm '$CLUSTER_NETWORK' 2>/dev/null || true" -TimeoutSeconds 20
     }
 
-    Write-Host "Verified: no k8s-* containers remain in wslc." -ForegroundColor Green
+    # Verify no cluster containers remain
+    $psOutput = Invoke-WslcCommand -Command "nerdctl ps -a 2>/dev/null" -CaptureOutput $true -TimeoutSeconds 20
+    $pattern = "$([regex]::Escape($CONTROL_PLANE_NAME))|$([regex]::Escape($WORKER_NAME_PREFIX))|$([regex]::Escape($HOST_PROXY_NAME))|$([regex]::Escape($VM_RELAY_NAME))"
+    $remaining = @($psOutput | Where-Object { $_ -match $pattern })
+    if ($remaining.Count -gt 0) {
+        throw "Delete incomplete. Remaining cluster containers detected:`n$($remaining -join "`n")"
+    }
+
+    Write-Host "Verified: no cluster containers remain in wslc." -ForegroundColor Green
 }
 
 # Always clean up temp files and data dirs (safe even on fresh system)

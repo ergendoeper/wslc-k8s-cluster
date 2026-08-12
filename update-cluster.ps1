@@ -89,9 +89,13 @@ Write-Host "Uploading update-nodes.sh to wslc VM..."
 $writeCommand = "echo '$base64Script' | base64 -d > /tmp/update-nodes.sh && chmod +x /tmp/update-nodes.sh && echo '=== UPLOAD_SUCCESS ==='"
 Invoke-WslcCommand -Command $writeCommand -Sentinel "=== UPLOAD_SUCCESS ==="
 
-# 3. Execute update-nodes.sh
+# 3. Execute update-nodes.sh with config environment variables
 Write-Host "Executing update-nodes.sh inside the wslc VM..." -ForegroundColor Yellow
-Invoke-WslcCommand -Command "/tmp/update-nodes.sh" -Sentinel "=== UPDATE SUCCESS ==="
+$runCommand = "export CONTROL_PLANE_NAME='$CONTROL_PLANE_NAME'; " +
+              "export WORKER_NAME_PREFIX='$WORKER_NAME_PREFIX'; " +
+              "export WORKER_COUNT='$WORKER_COUNT'; " +
+              "/tmp/update-nodes.sh"
+Invoke-WslcCommand -Command $runCommand -Sentinel "=== UPDATE SUCCESS ==="
 
 Write-Host "=== OS Update Complete! ===" -ForegroundColor Green
 

@@ -4,13 +4,21 @@ set -e
 # Ensure standard paths are in PATH
 export PATH=$PATH:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+# Configuration — environment variables with defaults
+CONTROL_PLANE_NAME="${CONTROL_PLANE_NAME:-k8s-control-plane}"
+WORKER_NAME_PREFIX="${WORKER_NAME_PREFIX:-k8s-worker}"
+WORKER_COUNT="${WORKER_COUNT:-4}"
+
 echo "=== 1. Checking nerdctl ==="
 if ! command -v nerdctl &> /dev/null; then
     echo "nerdctl not found! Make sure the cluster is set up first."
     exit 1
 fi
 
-CONTAINERS=("k8s-control-plane" "k8s-worker-1" "k8s-worker-2" "k8s-worker-3" "k8s-worker-4")
+CONTAINERS=("$CONTROL_PLANE_NAME")
+for i in $(seq 1 "$WORKER_COUNT"); do
+    CONTAINERS+=("${WORKER_NAME_PREFIX}-${i}")
+done
 
 echo "=== 2. Updating OS packages inside nodes ==="
 for container in "${CONTAINERS[@]}"; do

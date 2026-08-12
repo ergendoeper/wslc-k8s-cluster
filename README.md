@@ -97,10 +97,13 @@ run-e2e.bat
 
 ## Key Stability Fixes Included
 
+- Dynamic cluster topology & container naming across all host and guest scripts (`cluster-config.ps1`).
+- Guarded GPU device detection (`/dev/dxg`), preventing container initialization crashes on non-NVIDIA hosts.
+- Robust security hardening using `kubeadm` config integration and dynamic Pod Security Standards.
 - Self-healing default route and outbound HTTPS retries in `setup-nodes.sh`.
 - Robust kubeconfig capture in `create-cluster.ps1`.
 - Stable Flannel CNI plugin installation (ensures `/opt/cni/bin/flannel` exists).
-- Increased inotify limits for NVIDIA device plugin stability:
+- Increased inotify limits for device plugin stability:
   - `fs.inotify.max_user_instances=8192`
   - `fs.inotify.max_user_watches=524288`
 - Proxy improvements in `proxy-port.ps1` for stable local API forwarding.

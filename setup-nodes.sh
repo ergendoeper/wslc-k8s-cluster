@@ -123,8 +123,15 @@ for i in $(seq 1 "$WORKER_COUNT"); do
     mkdir -p "${DATA_DIR}/worker-${i}"
 done
 
-echo "=== 4. Starting Node Containers with GPU Mounts ==="
-# Mount /usr/lib/wsl and /dev/dxg to enable GPU capabilities inside nodes
+echo "=== 4. Starting Node Containers ==="
+GPU_FLAGS=()
+if [ "$ENABLE_GPU" = "true" ] && [ -e /dev/dxg ] && [ -d /usr/lib/wsl ]; then
+    echo "GPU support enabled and /dev/dxg device detected."
+    GPU_FLAGS=(-v /usr/lib/wsl:/usr/lib/wsl:ro --device /dev/dxg:/dev/dxg)
+else
+    echo "GPU support disabled or /dev/dxg not found. Running containers without GPU mounts."
+fi
+
 echo "Starting control plane..."
 nerdctl run -d --privileged \
   --name "$CONTROL_PLANE_NAME" \
@@ -134,8 +141,7 @@ nerdctl run -d --privileged \
   -v /etc/resolv.conf:/etc/resolv.conf:ro \
   -v /lib/modules:/lib/modules:ro \
   -v "${DATA_DIR}/control-plane:/var/lib/containerd" \
-  -v /usr/lib/wsl:/usr/lib/wsl:ro \
-  --device /dev/dxg:/dev/dxg \
+  "${GPU_FLAGS[@]}" \
   -p 6443:6443 \
   "${IMAGE}"
 
@@ -150,8 +156,7 @@ for i in $(seq 1 "$WORKER_COUNT"); do
       -v /etc/resolv.conf:/etc/resolv.conf:ro \
       -v /lib/modules:/lib/modules:ro \
       -v "${DATA_DIR}/worker-${i}:/var/lib/containerd" \
-      -v /usr/lib/wsl:/usr/lib/wsl:ro \
-      --device /dev/dxg:/dev/dxg \
+      "${GPU_FLAGS[@]}" \
       "${IMAGE}"
 done
 
@@ -180,13 +185,13 @@ for name in "${ALL_NODES[@]}"; do
 done
 
 echo "=== 5.6. Configuring GPU Driver Library Paths ==="
-# Add /usr/lib/wsl/lib to dynamic linker inside all containers and run ldconfig
+# Add /usr/lib/wsl/lib to dynamic linker inside all containers and run ldconfig if directory exists
 for name in "${ALL_NODES[@]}"; do
-    nerdctl exec "$name" sh -c "echo '/usr/lib/wsl/lib' > /etc/ld.so.conf.d/ld.wsl.conf && ldconfig"
+    nerdctl exec "$name" sh -c "if [ -d /usr/lib/wsl/lib ]; then echo '/usr/lib/wsl/lib' > /etc/ld.so.conf.d/ld.wsl.conf && ldconfig; fi"
 done
 
 echo "=== 5.7. Installing NVIDIA Container Toolkit inside Node Containers ==="
-if [ "$ENABLE_GPU" = "true" ]; then
+if [ "$ENABLE_GPU" = "true" ] && [ -e /dev/dxg ]; then
   for name in "${ALL_NODES[@]}"; do
     echo "Installing NVIDIA Container Toolkit in ${name}..."
     if ! nerdctl exec "$name" sh -c "
@@ -206,7 +211,7 @@ if [ "$ENABLE_GPU" = "true" ]; then
     fi
   done
 else
-  echo "GPU support disabled (ENABLE_GPU=false). Skipping NVIDIA Container Toolkit installation."
+  echo "GPU support disabled or /dev/dxg absent. Skipping NVIDIA Container Toolkit installation."
 fi
 
 echo "=== 5.8. Installing Standard CNI Plugins inside Node Containers ==="
@@ -261,6 +266,7 @@ apiServer:
   - 127.0.0.1
   - localhost
   - 10.240.0.1
+  - ${CONTROL_PLANE_IP}
   extraArgs:
     audit-policy-file: /etc/kubernetes/audit-policy.yaml
     audit-log-path: /var/log/kubernetes/audit.log

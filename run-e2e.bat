@@ -39,10 +39,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\update-cluster.ps1" -Conf
 if errorlevel 1 goto :fail
 
 echo [E2E] Step 6/7 - Verify cluster health (internal check)
-wslc system session run sh -lc "nerdctl exec k8s-control-plane kubectl get nodes -o wide"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ". '%CONFIG%'; wslc system session run sh -lc \"nerdctl exec $CONTROL_PLANE_NAME kubectl get nodes -o wide\""
 if errorlevel 1 goto :fail
 
-wslc system session run sh -lc "nerdctl exec k8s-control-plane kubectl get pods -A"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ". '%CONFIG%'; wslc system session run sh -lc \"nerdctl exec $CONTROL_PLANE_NAME kubectl get pods -A\""
 if errorlevel 1 goto :fail
 
 echo [E2E] Step 7/7 - Setup proxy and verify host kubectl access

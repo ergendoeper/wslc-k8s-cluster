@@ -89,8 +89,13 @@ Write-Host "Uploading harden-nodes.sh to wslc VM..."
 $writeCommand = "echo '$base64Script' | base64 -d > /tmp/harden-nodes.sh && chmod +x /tmp/harden-nodes.sh && echo '=== UPLOAD_SUCCESS ==='"
 Invoke-WslcCommand -Command $writeCommand -Sentinel "=== UPLOAD_SUCCESS ==="
 
-# 3. Execute harden-nodes.sh
+# 3. Execute harden-nodes.sh with config environment variables
 Write-Host "Executing harden-nodes.sh inside the wslc VM..." -ForegroundColor Yellow
-Invoke-WslcCommand -Command "/tmp/harden-nodes.sh" -Sentinel "=== HARDENING SUCCESS ==="
+$runCommand = "export CONTROL_PLANE_NAME='$CONTROL_PLANE_NAME'; " +
+              "export WORKER_NAME_PREFIX='$WORKER_NAME_PREFIX'; " +
+              "export WORKER_COUNT='$WORKER_COUNT'; " +
+              "export POD_SECURITY_STANDARD='$POD_SECURITY_STANDARD'; " +
+              "/tmp/harden-nodes.sh"
+Invoke-WslcCommand -Command $runCommand -Sentinel "=== HARDENING SUCCESS ==="
 
 Write-Host "=== Cluster Hardening Complete! ===" -ForegroundColor Green
