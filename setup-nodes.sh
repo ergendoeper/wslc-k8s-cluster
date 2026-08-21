@@ -6,7 +6,11 @@ export PATH=$PATH:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Configuration — values injected as environment variables by create-cluster.ps1.
 # Defaults are used when running the script standalone.
-K8S_VERSION="${K8S_VERSION:-v1.30.0}"
+K8S_VERSION="${K8S_VERSION:-v1.36.1}"
+KUBEADM_API_VERSION="${KUBEADM_API_VERSION:-v1beta4}"
+FLANNEL_VERSION="${FLANNEL_VERSION:-v0.28.5}"
+FLANNEL_CNI_PLUGIN_VERSION="${FLANNEL_CNI_PLUGIN_VERSION:-v1.9.1-flannel1}"
+CNI_PLUGINS_VERSION="${CNI_PLUGINS_VERSION:-v1.5.1}"
 NODE_IMAGE="${NODE_IMAGE:-kindest/node}"
 IMAGE="${NODE_IMAGE}:${K8S_VERSION}"
 WORKER_COUNT="${WORKER_COUNT:-4}"
@@ -73,6 +77,30 @@ wait_for_outbound_https() {
 
   echo "Outbound HTTPS is not reachable from wslc VM after retries."
   return 1
+}
+
+wait_for_cluster_ready() {
+  local timeout="${1:-600s}"
+
+  echo "=== Waiting for all nodes to become Ready ==="
+  if ! nerdctl exec "$CONTROL_PLANE_NAME" kubectl wait --for=condition=Ready nodes --all --timeout="${timeout}"; then
+    echo "Cluster node readiness check failed within ${timeout}."
+    nerdctl exec "$CONTROL_PLANE_NAME" kubectl get nodes -o wide || true
+    return 1
+  fi
+
+  echo "=== Waiting for all deployments to become Available ==="
+  if nerdctl exec "$CONTROL_PLANE_NAME" kubectl get deployments -A --no-headers >/dev/null 2>&1; then
+    if ! nerdctl exec "$CONTROL_PLANE_NAME" kubectl wait --for=condition=Available deployment --all -A --timeout="${timeout}"; then
+      echo "Cluster deployment availability check failed within ${timeout}."
+      nerdctl exec "$CONTROL_PLANE_NAME" kubectl get deploy -A -o wide || true
+      return 1
+    fi
+  else
+    echo "No deployments detected yet; skipping deployment readiness wait."
+  fi
+
+  return 0
 }
 
 echo "=== 0. Validating outbound network in wslc VM ==="
@@ -217,7 +245,7 @@ fi
 echo "=== 5.8. Installing Standard CNI Plugins inside Node Containers ==="
 if [ ! -f /tmp/cni-plugins.tgz ]; then
   wait_for_outbound_https
-  curl -L "https://github.com/containernetworking/plugins/releases/download/v1.5.1/cni-plugins-linux-amd64-v1.5.1.tgz" -o /tmp/cni-plugins.tgz
+  curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz" -o /tmp/cni-plugins.tgz
 fi
 for name in "${ALL_NODES[@]}"; do
     nerdctl cp /tmp/cni-plugins.tgz "${name}":/tmp/cni-plugins.tgz
@@ -247,7 +275,7 @@ EOF
 
 # Create a kubeadm config file for secure bootstrap
 nerdctl exec -i "$CONTROL_PLANE_NAME" tee /tmp/kubeadm-config.yaml > /dev/null << EOF
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/${KUBEADM_API_VERSION}
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: ${CONTROL_PLANE_IP}
@@ -257,7 +285,7 @@ nodeRegistration:
   imagePullPolicy: IfNotPresent
   name: ${CONTROL_PLANE_NAME}
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/${KUBEADM_API_VERSION}
 kind: ClusterConfiguration
 networking:
   podSubnet: ${POD_SUBNET}
@@ -268,11 +296,16 @@ apiServer:
   - 10.240.0.1
   - ${CONTROL_PLANE_IP}
   extraArgs:
-    audit-policy-file: /etc/kubernetes/audit-policy.yaml
-    audit-log-path: /var/log/kubernetes/audit.log
-    audit-log-maxsize: "100"
-    audit-log-maxbackup: "10"
-    profiling: "false"
+  - name: audit-policy-file
+    value: /etc/kubernetes/audit-policy.yaml
+  - name: audit-log-path
+    value: /var/log/kubernetes/audit.log
+  - name: audit-log-maxsize
+    value: "100"
+  - name: audit-log-maxbackup
+    value: "10"
+  - name: profiling
+    value: "false"
   extraVolumes:
   - name: audit-policy
     hostPath: /etc/kubernetes/audit-policy.yaml
@@ -312,7 +345,7 @@ nerdctl exec "$CONTROL_PLANE_NAME" kubectl apply -f https://github.com/flannel-i
 # Keep a deterministic initContainer set:
 # - install-cni-plugin provides /opt/cni/bin/flannel
 # - install-cni writes the CNI conflist
-nerdctl exec "$CONTROL_PLANE_NAME" kubectl -n kube-flannel patch ds kube-flannel-ds --type='merge' -p '{"spec":{"template":{"spec":{"initContainers":[{"name":"install-cni-plugin","image":"ghcr.io/flannel-io/flannel-cni-plugin:v1.9.1-flannel1","command":["cp"],"args":["-f","/flannel","/opt/cni/bin/flannel"],"volumeMounts":[{"name":"cni-plugin","mountPath":"/opt/cni/bin"}]},{"name":"install-cni","image":"ghcr.io/flannel-io/flannel:v0.28.5","command":["cp"],"args":["-f","/etc/kube-flannel/cni-conf.json","/etc/cni/net.d/10-flannel.conflist"],"volumeMounts":[{"name":"cni","mountPath":"/etc/cni/net.d"},{"name":"flannel-cfg","mountPath":"/etc/kube-flannel/"}]}]}}}}'
+nerdctl exec "$CONTROL_PLANE_NAME" kubectl -n kube-flannel patch ds kube-flannel-ds --type='merge' -p '{"spec":{"template":{"spec":{"initContainers":[{"name":"install-cni-plugin","image":"ghcr.io/flannel-io/flannel-cni-plugin:'"${FLANNEL_CNI_PLUGIN_VERSION}"'","command":["cp"],"args":["-f","/flannel","/opt/cni/bin/flannel"],"volumeMounts":[{"name":"cni-plugin","mountPath":"/opt/cni/bin"}]},{"name":"install-cni","image":"ghcr.io/flannel-io/flannel:'"${FLANNEL_VERSION}"'","command":["cp"],"args":["-f","/etc/kube-flannel/cni-conf.json","/etc/cni/net.d/10-flannel.conflist"],"volumeMounts":[{"name":"cni","mountPath":"/etc/cni/net.d"},{"name":"flannel-cfg","mountPath":"/etc/kube-flannel/"}]}]}}}}'
 
 echo "=== 8. Joining Worker Nodes ==="
 JOIN_CMD=$(nerdctl exec "$CONTROL_PLANE_NAME" kubeadm token create --print-join-command)
@@ -321,6 +354,8 @@ for i in $(seq 1 "$WORKER_COUNT"); do
     echo "Joining worker ${i} to the cluster..."
     nerdctl exec "${WORKER_NAME_PREFIX}-${i}" ${JOIN_CMD} --ignore-preflight-errors=all
 done
+
+wait_for_cluster_ready "600s"
 
 echo "=== 8.5. Detecting GPU Nodes and Installing NVIDIA Device Plugin ==="
 if [ "$ENABLE_GPU" = "true" ]; then
@@ -363,6 +398,11 @@ else
 fi
 
 echo "=== 9. Exporting Kubeconfig ==="
+if ! wait_for_cluster_ready "600s"; then
+  echo "Cluster did not reach Ready state before kubeconfig export. Aborting."
+  exit 1
+fi
+
 nerdctl exec "$CONTROL_PLANE_NAME" cat /etc/kubernetes/admin.conf > /tmp/admin.conf
 # Replace the container IP with 127.0.0.1 in the config
 sed -i "s/server: https:\/\/[0-9\.]*:6443/server: https:\/\/127.0.0.1:6443/g" /tmp/admin.conf

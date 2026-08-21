@@ -103,6 +103,10 @@ $dnsStr = $DNS_SERVERS -join " "
 
 Write-Host "Executing setup-nodes.sh inside the wslc VM..." -ForegroundColor Yellow
 $runCommand = "export K8S_VERSION='$K8S_VERSION'; " +
+              "export KUBEADM_API_VERSION='$KUBEADM_API_VERSION'; " +
+              "export FLANNEL_VERSION='$FLANNEL_VERSION'; " +
+              "export FLANNEL_CNI_PLUGIN_VERSION='$FLANNEL_CNI_PLUGIN_VERSION'; " +
+              "export CNI_PLUGINS_VERSION='$CNI_PLUGINS_VERSION'; " +
               "export NODE_IMAGE='$NODE_IMAGE'; " +
               "export WORKER_COUNT='$WORKER_COUNT'; " +
               "export CONTROL_PLANE_NAME='$CONTROL_PLANE_NAME'; " +

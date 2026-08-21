@@ -15,11 +15,19 @@
 
 
 # -----------------------------------------------------------------------------
-# Kubernetes-Version
+# Kubernetes-Version (Single Source of Truth)
 # Bestimmt das kindest/node Image-Tag. Muss ein verfügbares Tag auf Docker Hub
 # sein: https://hub.docker.com/r/kindest/node/tags
 # -----------------------------------------------------------------------------
-$K8S_VERSION = "v1.30.0"
+$K8S_VERSION = "v1.36.1"
+$KUBEADM_API_VERSION = "v1beta4"
+$FLANNEL_VERSION = "v0.28.5"
+$FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel1"
+$CNI_PLUGINS_VERSION = "v1.5.1"
+
+# Wichtiger Hinweis:
+# Diese Werte werden beim Cluster-Setup als Umgebungsvariablen exportiert und
+# sollten nur hier gepflegt werden. Vermeide manuelle Duplikate in Shell-Skripten.
 
 # -----------------------------------------------------------------------------
 # Cluster-Topologie

@@ -108,6 +108,24 @@ run-e2e.bat
   - `fs.inotify.max_user_watches=524288`
 - Proxy improvements in `proxy-port.ps1` for stable local API forwarding.
 
+## Validation & Recent Fixes
+
+The repository was audited for maintenance drift and runtime compatibility issues. The main remediation was to move Kubernetes and related bootstrap versions to a single source of truth in `cluster-config.ps1`, propagate the values into the VM bootstrap flow, and correct the kubeadm API configuration for modern Kubernetes releases.
+
+Validated on 2026-08-21 with a fresh end-to-end run:
+
+```powershell
+.\run-e2e.bat
+```
+
+Evidence from the final log:
+
+- `node/... condition met` for all control-plane and worker nodes
+- `kube-flannel-ds-... 1/1 Running`
+- `coredns-... 1/1 Running`
+- `nvidia-device-plugin-daemonset-... 1/1 Running`
+- `[E2E] SUCCESS - Full delete/create/harden/update flow completed.`
+
 ## Troubleshooting
 
 ### 1) `network is unreachable` during pulls
