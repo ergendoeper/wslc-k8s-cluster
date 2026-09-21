@@ -112,7 +112,7 @@ $POD_SECURITY_STANDARD = "baseline"
 # Version von nerdctl, die in der wslc-VM installiert wird, falls nicht
 # vorhanden. https://github.com/containerd/nerdctl/releases
 # -----------------------------------------------------------------------------
-$NERDCTL_VERSION = "1.7.6"
+$NERDCTL_VERSION = "1.7.7"
 
 # -----------------------------------------------------------------------------
 # Proxy-Container-Namen (intern)
