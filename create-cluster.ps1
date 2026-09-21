@@ -23,7 +23,7 @@ function Invoke-WslcCommand {
         [string]$Command,
         [string]$Sentinel,
         [bool]$CaptureOutput = $false,
-        [int]$TimeoutSeconds = 600
+        [int]$TimeoutSeconds = 1800
     )
 
     $processInfo = New-Object System.Diagnostics.ProcessStartInfo
@@ -97,6 +97,22 @@ Write-Host "Uploading setup-nodes.sh to wslc VM..."
 $writeCommand = "echo '$base64Script' | base64 -d > /tmp/setup-nodes.sh && chmod +x /tmp/setup-nodes.sh && echo '=== UPLOAD_SUCCESS ==='"
 Invoke-WslcCommand -Command $writeCommand -Sentinel "=== UPLOAD_SUCCESS ==="
 
+# 2b. Upload registry-mirrors.sh (nur wenn der Cache aktiv ist)
+if ($REGISTRY_ENABLE) {
+    $mirrorScriptPath = Join-Path $PSScriptRoot "registry-mirrors.sh"
+    if (Test-Path $mirrorScriptPath) {
+        Write-Host "Uploading registry-mirrors.sh to wslc VM..."
+        $mirrorBytes  = [System.IO.File]::ReadAllBytes($mirrorScriptPath)
+        $mirrorBase64 = [Convert]::ToBase64String($mirrorBytes)
+        $writeMirror  = "echo '$mirrorBase64' | base64 -d > /tmp/registry-mirrors.sh && echo '=== MIRROR_UPLOAD_OK ==='"
+        Invoke-WslcCommand -Command $writeMirror -Sentinel "=== MIRROR_UPLOAD_OK ==="
+    }
+    else {
+        Write-Warning "registry-mirrors.sh nicht gefunden neben create-cluster.ps1 - Registry-Cache wird uebersprungen."
+        $REGISTRY_ENABLE = $false
+    }
+}
+
 # 3. Execute setup-nodes.sh with config values as environment variables
 $enableGpuStr = if ($ENABLE_GPU) { "true" } else { "false" }
 $dnsStr = $DNS_SERVERS -join " "
@@ -107,6 +123,7 @@ $runCommand = "export K8S_VERSION='$K8S_VERSION'; " +
               "export FLANNEL_VERSION='$FLANNEL_VERSION'; " +
               "export FLANNEL_CNI_PLUGIN_VERSION='$FLANNEL_CNI_PLUGIN_VERSION'; " +
               "export CNI_PLUGINS_VERSION='$CNI_PLUGINS_VERSION'; " +
+              "export NVIDIA_DEVICE_PLUGIN_VERSION='$NVIDIA_DEVICE_PLUGIN_VERSION'; " +
               "export NODE_IMAGE='$NODE_IMAGE'; " +
               "export WORKER_COUNT='$WORKER_COUNT'; " +
               "export CONTROL_PLANE_NAME='$CONTROL_PLANE_NAME'; " +
@@ -119,6 +136,16 @@ $runCommand = "export K8S_VERSION='$K8S_VERSION'; " +
               "export INOTIFY_MAX_INSTANCES='$INOTIFY_MAX_INSTANCES'; " +
               "export INOTIFY_MAX_WATCHES='$INOTIFY_MAX_WATCHES'; " +
               "export NERDCTL_VERSION='$NERDCTL_VERSION'; " +
+              "export REGISTRY_ENABLE='$($REGISTRY_ENABLE.ToString().ToLower())'; " +
+              "export REGISTRY_HOST='$REGISTRY_HOST'; " +
+              "export REGISTRY_IP='$REGISTRY_IP'; " +
+              "export REGISTRY_PORT_DOCKERHUB='$REGISTRY_PORT_DOCKERHUB'; " +
+              "export REGISTRY_PORT_K8S='$REGISTRY_PORT_K8S'; " +
+              "export REGISTRY_PORT_GHCR='$REGISTRY_PORT_GHCR'; " +
+              "export REGISTRY_PORT_NVCR='$REGISTRY_PORT_NVCR'; " +
+              "export REGISTRY_PORT_LOCAL='$REGISTRY_PORT_LOCAL'; " +
+              "export APT_PROXY='$APT_PROXY'; " +
+              "export ARTIFACT_PROXY='$ARTIFACT_PROXY'; " +
               "/tmp/setup-nodes.sh"
 Invoke-WslcCommand -Command $runCommand -Sentinel "=== SUCCESS ==="
 

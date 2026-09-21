@@ -1,177 +1,158 @@
 # wslc-k8s-cluster
 
-This repository bootstraps a local multi-node Kubernetes cluster inside Microsoft wslc, then applies hardening and OS updates.
+This repository bootstraps a production-like local multi-node Kubernetes cluster inside Microsoft `wslc`, applies security hardening, integrates an optional local pull-through registry and artifact cache, and runs automated OS updates.
 
-## What This Repository Provides
+---
 
-- Create a Kubernetes cluster with one control-plane and four worker nodes.
-- Configure GPU support for WSL environments (NVIDIA toolkit + device plugin).
-- Apply security hardening (audit policy and API server settings).
-- Apply OS package updates across all node containers.
-- Clean up cluster resources and local state.
+## Features
+
+- **Multi-Node Cluster Topology**: 1 control-plane and configurable worker nodes (default: 4 workers) running as isolated containers inside the `wslc` VM.
+- **Local Pull-Through Registry & Artifact Cache**: Dedicated WSL2 cache distro (`k8s-cache`) caching Docker Hub, registry.k8s.io, GHCR, NVCR, APT packages (`apt-cacher-ng`), and release binaries (`nerdctl`, `cni-plugins`, manifests).
+- **GPU Acceleration**: NVIDIA Container Toolkit and NVIDIA Device Plugin integration with automatic NVML detection (`/dev/dxg`).
+- **Security Hardening**: Audit policies, secure kube-apiserver parameters, and dynamic Pod Security Standards (`baseline` / `restricted`).
+- **Automated OS & Security Updates**: Batch updates across all nodes via cached local repositories.
+- **Centralized Versioning & Renovate**: Single source of truth in `cluster-config.ps1` with automated dependency updates powered by Renovate Bot.
+- **Host `kubectl` Access**: Built-in API proxy (`proxy-port.ps1`) for accessing the cluster from Windows.
+
+---
 
 ## Repository Scripts
 
-- `create-cluster.ps1`: Uploads and runs `setup-nodes.sh` inside wslc, then exports kubeconfig to `%USERPROFILE%\\.kube\\config`.
-- `setup-nodes.sh`: Main cluster bootstrap workflow (container runtime prep, kubeadm init/join, Flannel, NVIDIA plugin).
-- `harden-cluster.ps1`: Uploads and runs `harden-nodes.sh` for hardening tasks.
-- `harden-nodes.sh`: Applies hardening inside the cluster nodes/control-plane.
-- `update-cluster.ps1`: Uploads and runs `update-nodes.sh` to update packages.
-- `update-nodes.sh`: Executes node-level package and security updates.
-- `delete-cluster.ps1`: Deletes cluster containers, network/data artifacts, and optional kubeconfig.
-- `proxy-port.ps1`: Starts a local API proxy for external `kubectl` access via `127.0.0.1:6443`.
+| Script | Environment | Description |
+|---|---|---|
+| `cluster-config.ps1` | Host | Central configuration file defining versions, topology, network, GPU, and paths. |
+| `setup-registry-cache.ps1` | Host (Admin) | Sets up the `k8s-cache` WSL distro, pull-through registries, NGINX artifact cache, and firewall/portproxy rules. |
+| `sync-registry-portproxy.ps1` | Host | Synchronizes Windows `netsh portproxy` rules with the dynamic IP of `k8s-cache`. |
+| `create-cluster.ps1` | Host | Uploads scripts to `wslc`, executes node bootstrap, and exports kubeconfig to `%USERPROFILE%\.kube\config`. |
+| `setup-nodes.sh` | wslc Guest | Main bootstrap script (runtime setup, image pulls, mirror configuration, `kubeadm init`/`join`, Flannel CNI, NVIDIA plugin). |
+| `registry-mirrors.sh` | wslc Guest | Configures containerd `hosts.toml`, `/etc/hosts`, and APT proxy settings inside node containers. |
+| `harden-cluster.ps1` | Host | Uploads and executes `harden-nodes.sh`. |
+| `harden-nodes.sh` | wslc Guest | Applies audit policies and Kubernetes security configurations. |
+| `update-cluster.ps1` | Host | Uploads and executes `update-nodes.sh`. |
+| `update-nodes.sh` | wslc Guest | Performs node package updates (`apt update && apt upgrade`) utilizing `apt-cacher-ng`. |
+| `delete-cluster.ps1` | Host | Gracefully removes cluster containers, networks, and temp data. |
+| `proxy-port.ps1` | Host | Starts a local port proxy forwarding `127.0.0.1:6443` to the internal Kubernetes API server. |
+| `run-e2e.bat` | Host | Complete end-to-end orchestration runner (Delete -> Reset -> Cache Sync -> Create -> Harden -> Update -> Verify). |
+
+---
 
 ## Prerequisites
 
-- Windows host with:
-  - `wslc.exe`
-  - PowerShell (5.1+ or PowerShell 7)
-  - `kubectl` (optional for host-side checks)
-- Network access to required registries and package sources (Docker Hub, Debian mirrors, etc.).
+- **Windows 11** with:
+  - `wslc.exe` installed and reachable in `PATH`.
+  - PowerShell 5.1+ or PowerShell 7.
+  - Optional: `kubectl` on the Windows host for external cluster management.
+  - For GPU support: NVIDIA GPU with current Game Ready / Studio drivers (WSL2 CUDA/DXG enabled).
+  - For Registry Cache: WSL2 with systemd enabled (standard on modern Windows 11).
 
-## Standard Workflow
+---
 
-Run from this folder (`D:\\AI\\wslc-k8s-cluster`):
+## Quick Start
 
-1. Create cluster
+### 1. (Recommended) Set Up Local Registry Cache
 
-```powershell
-.\create-cluster.ps1
-```
-
-2. Harden cluster
+Setting up the local registry cache accelerates image pulls and cluster creation significantly:
 
 ```powershell
-.\harden-cluster.ps1
+powershell -ExecutionPolicy Bypass -File .\setup-registry-cache.ps1
 ```
 
-3. Update nodes
+*(See [REGISTRY.md](file:///d:/AI/wslc-k8s-cluster/REGISTRY.md) for full registry documentation, options, and maintenance).*
 
-```powershell
-.\update-cluster.ps1
-```
+### 2. Full Automated End-to-End Run
 
-4. Optional: Start local API proxy for host `kubectl`
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\proxy-port.ps1
-```
-
-5. Verify from host
-
-```powershell
-kubectl get nodes -o wide
-kubectl get pods -A
-```
-
-## Reset / Cleanup
-
-Delete cluster resources:
-
-```powershell
-.\delete-cluster.ps1
-```
-
-Delete cluster resources and remove local kubeconfig:
-
-```powershell
-.\delete-cluster.ps1 -RemoveKubeconfig
-```
-
-## Automated E2E Batch Run
-
-This repo includes `run-e2e.bat` to perform:
-
-1. Delete cluster
-2. Reset wslc session/VM state
-3. Create cluster
-4. Harden cluster
-5. Update cluster
-6. Verify nodes and pods from inside control-plane
-
-Run:
+To run the complete lifecycle test (delete, sync cache, create, harden, update, and verify):
 
 ```cmd
 run-e2e.bat
 ```
 
-## Key Stability Fixes Included
+### 3. Step-by-Step Manual Workflow
 
-- Dynamic cluster topology & container naming across all host and guest scripts (`cluster-config.ps1`).
-- Guarded GPU device detection (`/dev/dxg`), preventing container initialization crashes on non-NVIDIA hosts.
-- Robust security hardening using `kubeadm` config integration and dynamic Pod Security Standards.
-- Self-healing default route and outbound HTTPS retries in `setup-nodes.sh`.
-- Robust kubeconfig capture in `create-cluster.ps1`.
-- Stable Flannel CNI plugin installation (ensures `/opt/cni/bin/flannel` exists).
-- Increased inotify limits for device plugin stability:
-  - `fs.inotify.max_user_instances=8192`
-  - `fs.inotify.max_user_watches=524288`
-- Proxy improvements in `proxy-port.ps1` for stable local API forwarding.
-
-## Validation & Recent Fixes
-
-The repository was audited for maintenance drift and runtime compatibility issues. The main remediation was to move Kubernetes and related bootstrap versions to a single source of truth in `cluster-config.ps1`, propagate the values into the VM bootstrap flow, and correct the kubeadm API configuration for modern Kubernetes releases.
-
-Validated on 2026-08-21 with a fresh end-to-end run:
+Run from the repository root:
 
 ```powershell
-.\run-e2e.bat
+# Step 1: Create the cluster
+.\create-cluster.ps1
+
+# Step 2: Apply security hardening
+.\harden-cluster.ps1
+
+# Step 3: Run package updates across all nodes
+.\update-cluster.ps1
+
+# Step 4: (Optional) Expose API server to Windows host
+powershell -ExecutionPolicy Bypass -File .\proxy-port.ps1
+
+# Step 5: Verify cluster status from host
+kubectl get nodes -o wide
+kubectl get pods -A
 ```
 
-Evidence from the final log:
+### 4. Teardown / Cleanup
 
-- `node/... condition met` for all control-plane and worker nodes
-- `kube-flannel-ds-... 1/1 Running`
-- `coredns-... 1/1 Running`
-- `nvidia-device-plugin-daemonset-... 1/1 Running`
-- `[E2E] SUCCESS - Full delete/create/harden/update flow completed.`
+```powershell
+# Remove cluster resources
+.\delete-cluster.ps1
+
+# Remove cluster resources and clear host kubeconfig
+.\delete-cluster.ps1 -RemoveKubeconfig
+```
+
+---
+
+## Dependency Management & Renovate
+
+All component versions are centralized in `cluster-config.ps1`:
+- `K8S_VERSION` / `NODE_IMAGE` (`kindest/node`)
+- `FLANNEL_VERSION`
+- `FLANNEL_CNI_PLUGIN_VERSION`
+- `CNI_PLUGINS_VERSION`
+- `NERDCTL_VERSION`
+- `NVIDIA_DEVICE_PLUGIN_VERSION`
+
+Automated dependency updates are managed via Renovate Bot:
+- Configuration: [`.github/renovate.json`](file:///d:/AI/wslc-k8s-cluster/.github/renovate.json)
+- GitHub Actions Workflow: [`.github/workflows/renovate.yml`](file:///d:/AI/wslc-k8s-cluster/.github/workflows/renovate.yml)
+
+Custom regex managers in Renovate inspect `cluster-config.ps1` and `setup-registry-cache.ps1` to open pull requests whenever new upstream releases or container tags become available.
+
+---
+
+## Key Stability Fixes & Architecture
+
+- **Pull-Through Registry & APT Cache**:
+  - Pulls from Docker Hub, `registry.k8s.io`, `ghcr.io`, and `nvcr.io` are cached locally in the `k8s-cache` WSL distro.
+  - Windows `netsh portproxy` connects specifically to the `k8s-cache` internal IP, avoiding loopback conflicts on `0.0.0.0`.
+  - Host address discovery prioritizes `vEthernet (WSL)` over the default gateway, ensuring direct connectivity between `wslc` and the Windows host.
+  - Fail-safe fallback: If the cache is unreachable, `registry-mirrors.sh` automatically falls back to upstream registries without failing cluster deployment.
+- **Dynamic Topology**:
+  - Worker count and naming prefixes are dynamically generated across all scripts based on `cluster-config.ps1`.
+- **GPU Safety**:
+  - Guarded GPU device detection checks for `/dev/dxg` and `libnvidia-ml.so.1` before mounting or enabling NVIDIA plugins, preventing initialization failures on non-GPU hardware.
+- **Inotify Limits**:
+  - Kernel sysctls (`fs.inotify.max_user_instances=8192`, `fs.inotify.max_user_watches=524288`) prevent device plugin crashes under high pod counts.
+- **Extended Provisioning Timeouts**:
+  - Execution timeout raised to 1800s in `create-cluster.ps1` to accommodate multi-node deployments with large container pulls.
+
+---
 
 ## Troubleshooting
 
-### 1) `network is unreachable` during pulls
+### 1. Registry Cache connection refused or timeout
+- Run `powershell -ExecutionPolicy Bypass -File .\sync-registry-portproxy.ps1` to re-sync portproxy IP addresses.
+- Verify `wsl -d k8s-cache -- docker ps` shows all registry containers running.
+- Check Windows firewall rule: `Get-NetFirewallRule -DisplayName 'WSLC k8s cache'`.
 
-Symptom:
-- Image pulls to Docker/GitHub fail even though DNS resolves.
+### 2. Network unreachable during image pulls
+- Built-in route verification in `setup-nodes.sh` repairs missing default gateways automatically.
+- Ensure your host network adapter has outbound internet access.
 
-Cause:
-- Missing default route in a wslc session.
+### 3. Flannel CNI plugin missing
+- `setup-nodes.sh` downloads and deploys `cni-plugins` and the Flannel CNI plugin binary to `/opt/cni/bin/` on all nodes prior to network startup.
 
-Mitigation:
-- Built-in route/HTTPS pre-check in `setup-nodes.sh`.
-- Re-run create workflow if needed.
+---
 
-### 2) Pods stuck in `ContainerCreating` with Flannel error
+## License
 
-Symptom:
-- `failed to find plugin "flannel" in path [/opt/cni/bin]`
-
-Cause:
-- Missing `flannel` CNI binary on nodes.
-
-Mitigation:
-- Flannel DaemonSet init container `install-cni-plugin` copies `/flannel` to `/opt/cni/bin/flannel`.
-
-### 3) NVIDIA device plugin CrashLoop
-
-Symptom:
-- `failed to create FS watcher ... too many open files`
-
-Cause:
-- Low inotify limits.
-
-Mitigation:
-- Increase inotify sysctls on all nodes (already automated in `setup-nodes.sh`).
-
-### 4) PowerShell quoting issues with nested `sh -lc` commands
-
-Symptom:
-- Errors like `unexpected EOF while looking for matching '\''`.
-
-Mitigation:
-- Prefer single quotes around outer `sh -lc` command in PowerShell.
-- Escape JSONPath/newline sequences carefully.
-
-## Notes
-
-- Node containers are ephemeral by design. Re-running `create-cluster.ps1` is the standard way to refresh the base Kubernetes node image.
-- Host `kubectl` access depends on local proxy and kubeconfig state.
+MIT License. See repository for details.

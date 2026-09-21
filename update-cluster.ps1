@@ -89,11 +89,31 @@ Write-Host "Uploading update-nodes.sh to wslc VM..."
 $writeCommand = "echo '$base64Script' | base64 -d > /tmp/update-nodes.sh && chmod +x /tmp/update-nodes.sh && echo '=== UPLOAD_SUCCESS ==='"
 Invoke-WslcCommand -Command $writeCommand -Sentinel "=== UPLOAD_SUCCESS ==="
 
+# 2b. Upload registry-mirrors.sh (nur wenn der Cache aktiv ist)
+if ($REGISTRY_ENABLE) {
+    $mirrorScriptPath = Join-Path $PSScriptRoot "registry-mirrors.sh"
+    if (Test-Path $mirrorScriptPath) {
+        Write-Host "Uploading registry-mirrors.sh to wslc VM..."
+        $mirrorBytes  = [System.IO.File]::ReadAllBytes($mirrorScriptPath)
+        $mirrorBase64 = [Convert]::ToBase64String($mirrorBytes)
+        $writeMirror  = "echo '$mirrorBase64' | base64 -d > /tmp/registry-mirrors.sh && echo '=== MIRROR_UPLOAD_OK ==='"
+        Invoke-WslcCommand -Command $writeMirror -Sentinel "=== MIRROR_UPLOAD_OK ==="
+    }
+    else {
+        Write-Warning "registry-mirrors.sh nicht gefunden neben update-cluster.ps1 - Registry-Cache wird uebersprungen."
+        $REGISTRY_ENABLE = $false
+    }
+}
+
 # 3. Execute update-nodes.sh with config environment variables
 Write-Host "Executing update-nodes.sh inside the wslc VM..." -ForegroundColor Yellow
 $runCommand = "export CONTROL_PLANE_NAME='$CONTROL_PLANE_NAME'; " +
               "export WORKER_NAME_PREFIX='$WORKER_NAME_PREFIX'; " +
               "export WORKER_COUNT='$WORKER_COUNT'; " +
+              "export REGISTRY_ENABLE='$($REGISTRY_ENABLE.ToString().ToLower())'; " +
+              "export REGISTRY_HOST='$REGISTRY_HOST'; " +
+              "export REGISTRY_IP='$REGISTRY_IP'; " +
+              "export APT_PROXY='$APT_PROXY'; " +
               "/tmp/update-nodes.sh"
 Invoke-WslcCommand -Command $runCommand -Sentinel "=== UPDATE SUCCESS ==="
 

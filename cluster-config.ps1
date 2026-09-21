@@ -24,6 +24,7 @@ $KUBEADM_API_VERSION = "v1beta4"
 $FLANNEL_VERSION = "v0.28.5"
 $FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel1"
 $CNI_PLUGINS_VERSION = "v1.5.1"
+$NVIDIA_DEVICE_PLUGIN_VERSION = "v0.15.0"
 
 # Wichtiger Hinweis:
 # Diese Werte werden beim Cluster-Setup als Umgebungsvariablen exportiert und
@@ -120,3 +121,7 @@ $NERDCTL_VERSION = "1.7.6"
 # -----------------------------------------------------------------------------
 $HOST_PROXY_NAME = "host-local-k8s-proxy"
 $VM_RELAY_NAME   = "host-k8s-api-relay"
+
+# Registry-Cache einbinden (erzeugt von setup-registry-cache.ps1)
+$registryConfig = Join-Path $PSScriptRoot 'cluster-config.registry.ps1'
+if (Test-Path $registryConfig) { . $registryConfig } else { $REGISTRY_ENABLE = $false }

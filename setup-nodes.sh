@@ -24,6 +24,18 @@ ENABLE_GPU="${ENABLE_GPU:-true}"
 INOTIFY_MAX_INSTANCES="${INOTIFY_MAX_INSTANCES:-8192}"
 INOTIFY_MAX_WATCHES="${INOTIFY_MAX_WATCHES:-524288}"
 NERDCTL_VERSION="${NERDCTL_VERSION:-1.7.6}"
+NVIDIA_DEVICE_PLUGIN_VERSION="${NVIDIA_DEVICE_PLUGIN_VERSION:-v0.15.0}"
+# Sourcing registry mirror helper functions if available
+if [ -f "$(dirname "$0")/registry-mirrors.sh" ]; then
+  source "$(dirname "$0")/registry-mirrors.sh"
+else
+  REGISTRY_ENABLE="${REGISTRY_ENABLE:-false}"
+  registry_available() { return 1; }
+  registry_configure_vm() { :; }
+  registry_configure_apt() { :; }
+  registry_configure_node() { :; }
+  registry_artifact_url() { echo "$2"; }
+fi
 
 # Build list of all node names
 ALL_NODES=("$CONTROL_PLANE_NAME")
@@ -106,11 +118,17 @@ wait_for_cluster_ready() {
 echo "=== 0. Validating outbound network in wslc VM ==="
 wait_for_outbound_https
 
+# Configure VM containerd client for Docker Hub cache mirror
+registry_configure_vm
+
 echo "=== 1. Checking nerdctl ==="
 if ! command -v nerdctl &> /dev/null; then
     echo "nerdctl not found. Installing to /usr/bin/..."
     if [ ! -f /tmp/nerdctl.tar.gz ]; then
-        curl -L "https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-${NERDCTL_VERSION}-linux-amd64.tar.gz" -o /tmp/nerdctl.tar.gz
+        NERDCTL_URL=$(registry_artifact_url \
+            "nerdctl-${NERDCTL_VERSION}-linux-amd64.tar.gz" \
+            "https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-${NERDCTL_VERSION}-linux-amd64.tar.gz")
+        curl -L "$NERDCTL_URL" -o /tmp/nerdctl.tar.gz
     fi
     tar -xzf /tmp/nerdctl.tar.gz -C /usr/bin/
     echo "nerdctl installed successfully."
@@ -122,7 +140,7 @@ echo "=== 2. Pulling node image ==="
 wait_for_outbound_https
 PULL_OK=false
 for attempt in 1 2 3 4 5; do
-  if nerdctl pull "${IMAGE}"; then
+  if nerdctl --hosts-dir=/etc/containerd/certs.d pull "${IMAGE}"; then
     PULL_OK=true
     break
   fi
@@ -218,6 +236,11 @@ for name in "${ALL_NODES[@]}"; do
     nerdctl exec "$name" sh -c "if [ -d /usr/lib/wsl/lib ]; then echo '/usr/lib/wsl/lib' > /etc/ld.so.conf.d/ld.wsl.conf && ldconfig; fi"
 done
 
+echo "=== 5.65. Configuring APT Proxy inside Node Containers ==="
+for name in "${ALL_NODES[@]}"; do
+    registry_configure_apt "$name"
+done
+
 echo "=== 5.7. Installing NVIDIA Container Toolkit inside Node Containers ==="
 if [ "$ENABLE_GPU" = "true" ] && [ -e /dev/dxg ]; then
   for name in "${ALL_NODES[@]}"; do
@@ -245,12 +268,20 @@ fi
 echo "=== 5.8. Installing Standard CNI Plugins inside Node Containers ==="
 if [ ! -f /tmp/cni-plugins.tgz ]; then
   wait_for_outbound_https
-  curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz" -o /tmp/cni-plugins.tgz
+  CNI_URL=$(registry_artifact_url \
+      "cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz" \
+      "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz")
+  curl -L "$CNI_URL" -o /tmp/cni-plugins.tgz
 fi
 for name in "${ALL_NODES[@]}"; do
     nerdctl cp /tmp/cni-plugins.tgz "${name}":/tmp/cni-plugins.tgz
     nerdctl exec "${name}" tar -xzf /tmp/cni-plugins.tgz -C /opt/cni/bin/
     nerdctl exec "${name}" rm -f /tmp/cni-plugins.tgz
+done
+
+echo "=== 5.9. Configuring Registry Mirror in All Node Containers ==="
+for name in "${ALL_NODES[@]}"; do
+    registry_configure_node "$name"
 done
 
 echo "=== 6. Bootstrapping Control Plane with Hardened Settings ==="
@@ -340,7 +371,10 @@ echo "=== 6.5. Applying Default Pod Security Standards ==="
 nerdctl exec "$CONTROL_PLANE_NAME" kubectl label namespace default pod-security.kubernetes.io/enforce=baseline --overwrite
 
 echo "=== 7. Installing Flannel CNI ==="
-nerdctl exec "$CONTROL_PLANE_NAME" kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+FLANNEL_MANIFEST=$(registry_artifact_url \
+    "kube-flannel-${FLANNEL_VERSION}.yml" \
+    "https://github.com/flannel-io/flannel/releases/download/${FLANNEL_VERSION}/kube-flannel.yml")
+nerdctl exec "$CONTROL_PLANE_NAME" kubectl apply -f "$FLANNEL_MANIFEST"
 
 # Keep a deterministic initContainer set:
 # - install-cni-plugin provides /opt/cni/bin/flannel
@@ -387,8 +421,11 @@ if [ "$ENABLE_GPU" = "true" ]; then
   done
 
   if [ "$GPU_NODE_FOUND" = true ]; then
-    nerdctl exec "$CONTROL_PLANE_NAME" kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
-    nerdctl exec "$CONTROL_PLANE_NAME" kubectl -n kube-system patch ds nvidia-device-plugin-daemonset --type='merge' -p '{"spec":{"template":{"spec":{"nodeSelector":{"nvidia.com/gpu.present":"true"},"volumes":[{"name":"device-plugin","hostPath":{"path":"/var/lib/kubelet/device-plugins"}},{"name":"wsl-lib","hostPath":{"path":"/usr/lib/wsl/lib"}}],"containers":[{"name":"nvidia-device-plugin-ctr","image":"nvcr.io/nvidia/k8s-device-plugin:v0.15.0","imagePullPolicy":"IfNotPresent","securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"env":[{"name":"FAIL_ON_INIT_ERROR","value":"false"},{"name":"LD_LIBRARY_PATH","value":"/usr/lib/wsl/lib:/usr/local/nvidia/lib64:/usr/local/nvidia/lib"}],"volumeMounts":[{"name":"device-plugin","mountPath":"/var/lib/kubelet/device-plugins"},{"name":"wsl-lib","mountPath":"/usr/lib/wsl/lib","readOnly":true}]}]}}}}'
+    NVDP_MANIFEST=$(registry_artifact_url \
+        "nvidia-device-plugin-${NVIDIA_DEVICE_PLUGIN_VERSION}.yml" \
+        "https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/${NVIDIA_DEVICE_PLUGIN_VERSION}/deployments/static/nvidia-device-plugin.yml")
+    nerdctl exec "$CONTROL_PLANE_NAME" kubectl apply -f "$NVDP_MANIFEST"
+    nerdctl exec "$CONTROL_PLANE_NAME" kubectl -n kube-system patch ds nvidia-device-plugin-daemonset --type='merge' -p "{\"spec\":{\"template\":{\"spec\":{\"nodeSelector\":{\"nvidia.com/gpu.present\":\"true\"},\"volumes\":[{\"name\":\"device-plugin\",\"hostPath\":{\"path\":\"/var/lib/kubelet/device-plugins\"}},{\"name\":\"wsl-lib\",\"hostPath\":{\"path\":\"/usr/lib/wsl/lib\"}}],\"containers\":[{\"name\":\"nvidia-device-plugin-ctr\",\"image\":\"nvcr.io/nvidia/k8s-device-plugin:${NVIDIA_DEVICE_PLUGIN_VERSION}\",\"imagePullPolicy\":\"IfNotPresent\",\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"env\":[{\"name\":\"FAIL_ON_INIT_ERROR\",\"value\":\"false\"},{\"name\":\"LD_LIBRARY_PATH\",\"value\":\"/usr/lib/wsl/lib:/usr/local/nvidia/lib64:/usr/local/nvidia/lib\"}],\"volumeMounts\":[{\"name\":\"device-plugin\",\"mountPath\":\"/var/lib/kubelet/device-plugins\"},{\"name\":\"wsl-lib\",\"mountPath\":\"/usr/lib/wsl/lib\",\"readOnly\":true}]}]}}}}"
     nerdctl exec "$CONTROL_PLANE_NAME" kubectl -n kube-system rollout restart ds/nvidia-device-plugin-daemonset
   else
     echo "Skipping NVIDIA Device Plugin install: no NVML library detected in node containers."

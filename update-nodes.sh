@@ -9,6 +9,14 @@ CONTROL_PLANE_NAME="${CONTROL_PLANE_NAME:-k8s-control-plane}"
 WORKER_NAME_PREFIX="${WORKER_NAME_PREFIX:-k8s-worker}"
 WORKER_COUNT="${WORKER_COUNT:-4}"
 
+# Sourcing registry mirror helper functions if available
+if [ -f "$(dirname "$0")/registry-mirrors.sh" ]; then
+  source "$(dirname "$0")/registry-mirrors.sh"
+else
+  REGISTRY_ENABLE="${REGISTRY_ENABLE:-false}"
+  registry_configure_apt() { :; }
+fi
+
 echo "=== 1. Checking nerdctl ==="
 if ! command -v nerdctl &> /dev/null; then
     echo "nerdctl not found! Make sure the cluster is set up first."
@@ -24,6 +32,7 @@ echo "=== 2. Updating OS packages inside nodes ==="
 for container in "${CONTAINERS[@]}"; do
     if nerdctl ps --format '{{.Names}}' | grep -q "^${container}$"; then
         echo "Updating security patches and OS packages inside ${container}..."
+        registry_configure_apt "${container}"
         # Debian image variants can miss bash builtins manpage target, which breaks update-alternatives during bash upgrades.
         if nerdctl exec "${container}" sh -c "
             export DEBIAN_FRONTEND=noninteractive

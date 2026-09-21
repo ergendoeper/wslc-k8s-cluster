@@ -1,0 +1,96 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for wslc-k8s-cluster",
+  "extends": [
+    "config:recommended"
+  ],
+  "labels": ["dependencies", "renovate"],
+  "timezone": "Europe/Berlin",
+  "schedule": ["before 6am on Monday"],
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 10,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track kindest/node Docker Hub image tag for K8S_VERSION in cluster-config.ps1",
+      "fileMatch": ["^cluster-config\\.ps1$"],
+      "matchStrings": [
+        "\\$K8S_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "kindest/node",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Track flannel-io/flannel releases in cluster-config.ps1",
+      "fileMatch": ["^cluster-config\\.ps1$"],
+      "matchStrings": [
+        "\\$FLANNEL_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "flannel-io/flannel",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Track flannel-io/cni-plugin releases in cluster-config.ps1",
+      "fileMatch": ["^cluster-config\\.ps1$"],
+      "matchStrings": [
+        "\\$FLANNEL_CNI_PLUGIN_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "flannel-io/cni-plugin",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Track containernetworking/plugins releases in cluster-config.ps1",
+      "fileMatch": ["^cluster-config\\.ps1$"],
+      "matchStrings": [
+        "\\$CNI_PLUGINS_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "containernetworking/plugins",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Track containerd/nerdctl releases in cluster-config.ps1",
+      "fileMatch": ["^cluster-config\\.ps1$"],
+      "matchStrings": [
+        "\\$NERDCTL_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "containerd/nerdctl",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track NVIDIA/k8s-device-plugin releases in cluster-config.ps1",
+      "fileMatch": ["^cluster-config\\.ps1$"],
+      "matchStrings": [
+        "\\$NVIDIA_DEVICE_PLUGIN_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "NVIDIA/k8s-device-plugin",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Track registry Docker image in setup-registry-cache.ps1",
+      "fileMatch": ["^setup-registry-cache\\.ps1$"],
+      "matchStrings": [
+        "'(?<depName>registry):(?<currentValue>[0-9.]+)'"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group Flannel components together",
+      "matchPackageNames": ["flannel-io/flannel", "flannel-io/cni-plugin"],
+      "groupName": "flannel packages"
+    },
+    {
+      "description": "Automerge GitHub Action updates if tests pass",
+      "matchManagers": ["github-actions"],
+      "automerge": false
+    }
+  ]
+}

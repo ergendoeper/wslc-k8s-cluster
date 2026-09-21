@@ -22,9 +22,17 @@ echo [E2E] Step 1/8 - Delete cluster
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\delete-cluster.ps1" -Config "%CONFIG%"
 if errorlevel 1 goto :fail
 
-echo [E2E] Step 2/8 - Reset wslc session and WSL VM
+echo [E2E] Step 2/8 - Reset wslc session
 wslc system session terminate >nul 2>&1
-wsl --shutdown >nul 2>&1
+if not exist "%ROOT%cluster-config.registry.ps1" (
+    wsl --shutdown >nul 2>&1
+)
+
+if exist "%ROOT%cluster-config.registry.ps1" (
+    echo [E2E] Step 2b/8 - Ensuring Registry Cache is online
+    powershell -NoProfile -ExecutionPolicy Bypass -File ".\sync-registry-portproxy.ps1"
+    if errorlevel 1 goto :fail
+)
 
 echo [E2E] Step 3/8 - Create cluster
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\create-cluster.ps1" -Config "%CONFIG%"
