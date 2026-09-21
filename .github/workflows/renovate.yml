@@ -22,6 +22,11 @@ on:
       - '.github/renovate.json'
       - '.github/workflows/renovate.yml'
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   renovate:
     runs-on: ubuntu-latest
@@ -35,4 +40,5 @@ jobs:
           configurationFile: .github/renovate.json
           token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
         env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
           LOG_LEVEL: ${{ inputs.logLevel || 'info' }}

@@ -6,9 +6,13 @@
   ],
   "labels": ["dependencies", "renovate"],
   "timezone": "Europe/Berlin",
-  "schedule": ["before 6am on Monday"],
-  "prHourlyLimit": 5,
-  "prConcurrentLimit": 10,
+  "onboarding": false,
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 0,
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "ignoreTests": true,
   "customManagers": [
     {
       "customType": "regex",
@@ -88,9 +92,9 @@
       "groupName": "flannel packages"
     },
     {
-      "description": "Automerge GitHub Action updates if tests pass",
-      "matchManagers": ["github-actions"],
-      "automerge": false
+      "description": "Automerge all updates",
+      "matchPackageNames": ["*"],
+      "automerge": true
     }
   ]
 }
