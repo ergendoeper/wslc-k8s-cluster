@@ -18,7 +18,7 @@ Dadurch werden Container-Images, APT-Pakete und Binär-Artefakte (`nerdctl`, `cn
 │    ├── Port 5002 ──► k8s-cache Distro (ghcr.io Mirror)                     │
 │    ├── Port 5003 ──► k8s-cache Distro (nvcr.io Mirror)                     │
 │    ├── Port 5010 ──► k8s-cache Distro (Lokale Private Registry)            │
-│    ├── Port 8081 ──► k8s-cache Distro (NGINX Artefakt-Cache)               │
+│    ├── Port 8080 ──► k8s-cache Distro (NGINX Artefakt-Cache & Web-Hub)     │
 │    └── Port 3142 ──► k8s-cache Distro (apt-cacher-ng Paket-Proxy)          │
 └──────────────▲──────────────────────────────────────▲───────────────────────┘
                │                                      │
@@ -78,9 +78,9 @@ powershell -ExecutionPolicy Bypass -File .\setup-registry-cache.ps1
 .\setup-registry-cache.ps1 -DockerHubUser 'meinuser' -DockerHubPassword 'mein-token'
 
 # Versionen der gecachten Artefakte anpassen:
-.\setup-registry-cache.ps1 -NerdctlVersion '1.7.6' `
+.\setup-registry-cache.ps1 -NerdctlVersion '1.7.7' `
                            -CniPluginsVersion 'v1.5.1' `
-                           -FlannelVersion 'v0.28.5' `
+                           -FlannelVersion 'v0.28.9' `
                            -NvidiaDevicePluginVersion 'v0.15.0'
 
 # Kompletten Cache, Distro, Portproxy und Firewall-Regeln rückstandslos entfernen:
@@ -135,23 +135,26 @@ wslc system session run sh -lc "curl -sS -I http://172.24.112.1:5000/v2/"
 ```
 *(HTTP 200 oder HTTP 401 ist das erwartete Ergebnis der Registry-API).*
 
-Artefakt-Cache testen:
+Artefakt-Cache & Web-Hub testen:
 
 ```powershell
-wslc system session run sh -lc "curl -sS -I http://172.24.112.1:8081/"
+wslc system session run sh -lc "curl -sS -I http://172.24.112.1:8080/"
 ```
 
-### 3. Cache-Nutzung und Logs prüfen
+### 3. Cache-Nutzung, Dashboards und Logs prüfen
 
 ```powershell
+# WSLC Cluster Cache & Registry Hub Web-Dashboard im Browser öffnen:
+start http://localhost:8080
+
+# APT-Cacher-NG Web-Statistik im Browser öffnen:
+start http://localhost:3142/acng-report.html
+
 # Live-Logs des k8s-Mirrors während create-cluster.ps1 mitlesen:
 wsl -d k8s-cache -- docker logs -f registry-k8s
 
 # Speicherplatzbelegung der Registries:
 wsl -d k8s-cache -- du -sh /srv/registry/*
-
-# APT-Cacher-NG Web-Statistik im Browser öffnen:
-start http://127.0.0.1:3142/acng-report.html
 ```
 
 ### 4. Garbage Collection / Bereinigung

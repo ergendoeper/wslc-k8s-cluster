@@ -19,7 +19,7 @@
 # Bestimmt das kindest/node Image-Tag. Muss ein verfügbares Tag auf Docker Hub
 # sein: https://hub.docker.com/r/kindest/node/tags
 # -----------------------------------------------------------------------------
-$K8S_VERSION = "v1.36.1"
+$K8S_VERSION = "v1.37.0"
 $KUBEADM_API_VERSION = "v1beta4"
 $FLANNEL_VERSION = "v0.28.9"
 $FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel1"
@@ -45,7 +45,7 @@ $WORKER_COUNT = 4
 # Ändere diese Werte, wenn du mehrere Cluster parallel betreiben möchtest.
 # -----------------------------------------------------------------------------
 $CONTROL_PLANE_NAME = "k8s-control-plane"
-$WORKER_NAME_PREFIX  = "k8s-worker"
+$WORKER_NAME_PREFIX = "k8s-worker"
 
 # -----------------------------------------------------------------------------
 # Node-Image
@@ -61,8 +61,8 @@ $NODE_IMAGE = "kindest/node"
 # DNS_SERVERS:       DNS-Server, die in die Node-Container injiziert werden.
 # -----------------------------------------------------------------------------
 $CLUSTER_NETWORK = "bridge"
-$POD_SUBNET      = "10.244.0.0/16"
-$DNS_SERVERS     = @("1.1.1.1", "8.8.8.8")
+$POD_SUBNET = "10.244.0.0/16"
+$DNS_SERVERS = @("1.1.1.1", "8.8.8.8")
 
 # -----------------------------------------------------------------------------
 # Proxy-Port-Weiterleitung (proxy-port.ps1)
@@ -71,8 +71,8 @@ $DNS_SERVERS     = @("1.1.1.1", "8.8.8.8")
 # VM_RELAY_PORT:  Interner Port für den socat-Relay im wslc-VM.
 #                 Ändern, wenn Portkonflikte auftreten.
 # -----------------------------------------------------------------------------
-$LISTEN_ADDR   = "127.0.0.1"
-$LISTEN_PORT   = 6443
+$LISTEN_ADDR = "127.0.0.1"
+$LISTEN_PORT = 6443
 $VM_RELAY_PORT = 16443
 
 # -----------------------------------------------------------------------------
@@ -98,7 +98,7 @@ $ENABLE_GPU = $true
 # INOTIFY_MAX_WATCHES:   Empfohlen >= 65536 pro Node.
 # -----------------------------------------------------------------------------
 $INOTIFY_MAX_INSTANCES = 8192
-$INOTIFY_MAX_WATCHES   = 524288
+$INOTIFY_MAX_WATCHES = 524288
 
 # -----------------------------------------------------------------------------
 # Sicherheits-Hardening (harden-nodes.sh)
@@ -120,7 +120,7 @@ $NERDCTL_VERSION = "1.7.7"
 # Nur ändern bei Namenskonflikten.
 # -----------------------------------------------------------------------------
 $HOST_PROXY_NAME = "host-local-k8s-proxy"
-$VM_RELAY_NAME   = "host-k8s-api-relay"
+$VM_RELAY_NAME = "host-k8s-api-relay"
 
 # Registry-Cache einbinden (erzeugt von setup-registry-cache.ps1)
 $registryConfig = Join-Path $PSScriptRoot 'cluster-config.registry.ps1'

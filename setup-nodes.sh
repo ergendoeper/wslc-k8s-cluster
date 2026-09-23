@@ -6,9 +6,9 @@ export PATH=$PATH:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Configuration — values injected as environment variables by create-cluster.ps1.
 # Defaults are used when running the script standalone.
-K8S_VERSION="${K8S_VERSION:-v1.36.1}"
+K8S_VERSION="${K8S_VERSION:-v1.37.0}"
 KUBEADM_API_VERSION="${KUBEADM_API_VERSION:-v1beta4}"
-FLANNEL_VERSION="${FLANNEL_VERSION:-v0.28.5}"
+FLANNEL_VERSION="${FLANNEL_VERSION:-v0.28.9}"
 FLANNEL_CNI_PLUGIN_VERSION="${FLANNEL_CNI_PLUGIN_VERSION:-v1.9.1-flannel1}"
 CNI_PLUGINS_VERSION="${CNI_PLUGINS_VERSION:-v1.5.1}"
 NODE_IMAGE="${NODE_IMAGE:-kindest/node}"
@@ -23,7 +23,7 @@ DNS_SECONDARY="${DNS_SECONDARY:-8.8.8.8}"
 ENABLE_GPU="${ENABLE_GPU:-true}"
 INOTIFY_MAX_INSTANCES="${INOTIFY_MAX_INSTANCES:-8192}"
 INOTIFY_MAX_WATCHES="${INOTIFY_MAX_WATCHES:-524288}"
-NERDCTL_VERSION="${NERDCTL_VERSION:-1.7.6}"
+NERDCTL_VERSION="${NERDCTL_VERSION:-1.7.7}"
 NVIDIA_DEVICE_PLUGIN_VERSION="${NVIDIA_DEVICE_PLUGIN_VERSION:-v0.15.0}"
 # Sourcing registry mirror helper functions if available
 if [ -f "$(dirname "$0")/registry-mirrors.sh" ]; then

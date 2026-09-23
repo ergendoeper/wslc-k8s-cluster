@@ -121,8 +121,9 @@ Custom regex managers in Renovate inspect `cluster-config.ps1` and `setup-regist
 
 ## Key Stability Fixes & Architecture
 
-- **Pull-Through Registry & APT Cache**:
+- **Pull-Through Registry, APT Cache & Hub Dashboard**:
   - Pulls from Docker Hub, `registry.k8s.io`, `ghcr.io`, and `nvcr.io` are cached locally in the `k8s-cache` WSL distro.
+  - Modern Web Dashboard and Artifact Server accessible at `http://localhost:8080` for monitoring mirrors, private registry, and direct binary downloads.
   - Windows `netsh portproxy` connects specifically to the `k8s-cache` internal IP, avoiding loopback conflicts on `0.0.0.0`.
   - Host address discovery prioritizes `vEthernet (WSL)` over the default gateway, ensuring direct connectivity between `wslc` and the Windows host.
   - Fail-safe fallback: If the cache is unreachable, `registry-mirrors.sh` automatically falls back to upstream registries without failing cluster deployment.
