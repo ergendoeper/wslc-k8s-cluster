@@ -120,7 +120,7 @@ Invoke-WslcCommand -Command $runCommand -Sentinel "=== UPDATE SUCCESS ==="
 Write-Host "=== OS Update Complete! ===" -ForegroundColor Green
 
 Write-Host "`n=== To Update the Kubernetes/Node Image Version ===" -ForegroundColor Yellow
-Write-Host "1. Update 'K8S_VERSION' in 'cluster-config.ps1' (this is the single source of truth)."
+Write-Host "1. Update 'K8S_VERSION' and 'NODE_IMAGE_TAG' in 'cluster-config.ps1'."
 Write-Host "2. Optionally adjust related bootstrap versions in the same config file if needed."
 Write-Host "3. Rerun '.\create-cluster.ps1' to clean up and bootstrap the cluster with the updated image."
 Write-Host "   Note: Since node containers are ephemeral, re-running create-cluster.ps1 is the standard way to update images."

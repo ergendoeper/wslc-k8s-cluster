@@ -16,13 +16,23 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Track kindest/node Docker Hub image tag for K8S_VERSION in cluster-config.ps1",
+      "description": "Track kindest/node Docker Hub image tag for NODE_IMAGE_TAG in cluster-config.ps1",
+      "fileMatch": ["^cluster-config\\.ps1$"],
+      "matchStrings": [
+        "\\$NODE_IMAGE_TAG\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "kindest/node",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Track upstream Kubernetes releases for K8S_VERSION in cluster-config.ps1",
       "fileMatch": ["^cluster-config\\.ps1$"],
       "matchStrings": [
         "\\$K8S_VERSION\\s*=\\s*\"(?<currentValue>[^\"]+)\""
       ],
-      "depNameTemplate": "kindest/node",
-      "datasourceTemplate": "docker"
+      "depNameTemplate": "kubernetes/kubernetes",
+      "datasourceTemplate": "github-releases"
     },
     {
       "customType": "regex",

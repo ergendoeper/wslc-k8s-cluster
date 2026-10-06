@@ -6,13 +6,14 @@ export PATH=$PATH:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Configuration — values injected as environment variables by create-cluster.ps1.
 # Defaults are used when running the script standalone.
-K8S_VERSION="${K8S_VERSION:-v1.37.0}"
+K8S_VERSION="${K8S_VERSION:-v1.37.1}"
 KUBEADM_API_VERSION="${KUBEADM_API_VERSION:-v1beta4}"
 FLANNEL_VERSION="${FLANNEL_VERSION:-v0.28.9}"
 FLANNEL_CNI_PLUGIN_VERSION="${FLANNEL_CNI_PLUGIN_VERSION:-v1.9.1-flannel1}"
 CNI_PLUGINS_VERSION="${CNI_PLUGINS_VERSION:-v1.5.1}"
 NODE_IMAGE="${NODE_IMAGE:-kindest/node}"
-IMAGE="${NODE_IMAGE}:${K8S_VERSION}"
+NODE_IMAGE_TAG="${NODE_IMAGE_TAG:-${K8S_VERSION:-v1.37.0}}"
+IMAGE="${NODE_IMAGE}:${NODE_IMAGE_TAG}"
 WORKER_COUNT="${WORKER_COUNT:-4}"
 CONTROL_PLANE_NAME="${CONTROL_PLANE_NAME:-k8s-control-plane}"
 WORKER_NAME_PREFIX="${WORKER_NAME_PREFIX:-k8s-worker}"
@@ -149,7 +150,7 @@ for attempt in 1 2 3 4 5; do
 done
 
 if [ "$PULL_OK" != true ]; then
-  if nerdctl images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${NODE_IMAGE}:${K8S_VERSION}$"; then
+  if nerdctl images --format '{{.Repository}}:{{.Tag}}' | grep -q "^${IMAGE}$"; then
     echo "Proceeding with locally cached image ${IMAGE}."
   else
     echo "Failed to pull ${IMAGE} and no local cached image is available."

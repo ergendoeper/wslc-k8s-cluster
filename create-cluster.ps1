@@ -15,7 +15,10 @@ if (-not (Test-Path $Config)) {
 Write-Host "Using config: $Config" -ForegroundColor Cyan
 
 # Build derived values from config
-$IMAGE = "${NODE_IMAGE}:${K8S_VERSION}"
+if (-not $NODE_IMAGE_TAG) {
+    $NODE_IMAGE_TAG = $K8S_VERSION
+}
+$IMAGE = "${NODE_IMAGE}:${NODE_IMAGE_TAG}"
 
 # Function to invoke a command inside the wslc VM via bash, waiting for a sentinel line.
 function Invoke-WslcCommand {
@@ -75,11 +78,12 @@ function Invoke-WslcCommand {
 }
 
 Write-Host "=== Starting Kubernetes Cluster Setup using wslc ===" -ForegroundColor Green
-Write-Host "  K8S Version  : $K8S_VERSION"
-Write-Host "  Node Image   : $IMAGE"
-Write-Host "  Worker Count : $WORKER_COUNT"
-Write-Host "  Control Plane: $CONTROL_PLANE_NAME"
-Write-Host "  GPU Support  : $ENABLE_GPU"
+Write-Host "  K8S Version    : $K8S_VERSION"
+Write-Host "  Node Image Tag : $NODE_IMAGE_TAG"
+Write-Host "  Node Image     : $IMAGE"
+Write-Host "  Worker Count   : $WORKER_COUNT"
+Write-Host "  Control Plane  : $CONTROL_PLANE_NAME"
+Write-Host "  GPU Support    : $ENABLE_GPU"
 
 # 1. Read setup-nodes.sh and encode to base64
 $setupScriptPath = Join-Path $PSScriptRoot "setup-nodes.sh"
@@ -125,6 +129,7 @@ $runCommand = "export K8S_VERSION='$K8S_VERSION'; " +
               "export CNI_PLUGINS_VERSION='$CNI_PLUGINS_VERSION'; " +
               "export NVIDIA_DEVICE_PLUGIN_VERSION='$NVIDIA_DEVICE_PLUGIN_VERSION'; " +
               "export NODE_IMAGE='$NODE_IMAGE'; " +
+              "export NODE_IMAGE_TAG='$NODE_IMAGE_TAG'; " +
               "export WORKER_COUNT='$WORKER_COUNT'; " +
               "export CONTROL_PLANE_NAME='$CONTROL_PLANE_NAME'; " +
               "export WORKER_NAME_PREFIX='$WORKER_NAME_PREFIX'; " +

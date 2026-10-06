@@ -16,13 +16,12 @@
 
 # -----------------------------------------------------------------------------
 # Kubernetes-Version (Single Source of Truth)
-# Bestimmt das kindest/node Image-Tag. Muss ein verfügbares Tag auf Docker Hub
-# sein: https://hub.docker.com/r/kindest/node/tags
+# Definiert die Ziel-Kubernetes-Version des Clusters.
 # -----------------------------------------------------------------------------
-$K8S_VERSION = "v1.37.0"
+$K8S_VERSION = "v1.37.1"
 $KUBEADM_API_VERSION = "v1beta4"
 $FLANNEL_VERSION = "v0.28.9"
-$FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel1"
+$FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel3"
 $CNI_PLUGINS_VERSION = "v1.9.1"
 $NVIDIA_DEVICE_PLUGIN_VERSION = "v0.20.1"
 
@@ -50,9 +49,13 @@ $WORKER_NAME_PREFIX = "k8s-worker"
 # -----------------------------------------------------------------------------
 # Node-Image
 # Standard: kindest/node (KinD-kompatibles Kubernetes-in-Docker Image).
-# Nur ändern, wenn ein eigenes, kompatibles Image genutzt werden soll.
+# NODE_IMAGE_TAG: Bestimmt das konkrete Image-Tag auf Docker Hub:
+# https://hub.docker.com/r/kindest/node/tags
+# Kann von $K8S_VERSION abweichen, wenn für ein neues Kubernetes-Release noch kein
+# kindest/node Image auf Docker Hub bereitgestellt wurde (z.B. v1.37.0 vs. v1.37.1).
 # -----------------------------------------------------------------------------
 $NODE_IMAGE = "kindest/node"
+$NODE_IMAGE_TAG = "v1.37.0"
 
 # -----------------------------------------------------------------------------
 # Netzwerk

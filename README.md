@@ -104,7 +104,8 @@ kubectl get pods -A
 ## Dependency Management & Renovate
 
 All component versions are centralized in `cluster-config.ps1`:
-- `K8S_VERSION` / `NODE_IMAGE` (`kindest/node`)
+- `K8S_VERSION` (Kubernetes upstream version)
+- `NODE_IMAGE` / `NODE_IMAGE_TAG` (`kindest/node` Docker image & tag)
 - `FLANNEL_VERSION`
 - `FLANNEL_CNI_PLUGIN_VERSION`
 - `CNI_PLUGINS_VERSION`
@@ -116,6 +117,9 @@ Automated dependency updates are managed via Renovate Bot:
 - GitHub Actions Workflow: [`.github/workflows/renovate.yml`](file:///d:/AI/wslc-k8s-cluster/.github/workflows/renovate.yml)
 
 Custom regex managers in Renovate inspect `cluster-config.ps1` and `setup-registry-cache.ps1` to open pull requests whenever new upstream releases or container tags become available.
+
+> [!NOTE]
+> `NODE_IMAGE_TAG` specifies the available container image tag of `kindest/node` on Docker Hub, whereas `K8S_VERSION` references upstream Kubernetes releases. Decoupling them allows tracking both independently and prevents build failures when new Kubernetes patch releases are published prior to pre-built `kindest/node` container images on Docker Hub.
 
 ---
 
