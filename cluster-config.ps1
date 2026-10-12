@@ -20,7 +20,7 @@
 # -----------------------------------------------------------------------------
 $K8S_VERSION = "v1.37.1"
 $KUBEADM_API_VERSION = "v1beta4"
-$FLANNEL_VERSION = "v0.28.9"
+$FLANNEL_VERSION = "v0.28.10"
 $FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel3"
 $CNI_PLUGINS_VERSION = "v1.9.1"
 $NVIDIA_DEVICE_PLUGIN_VERSION = "v0.20.1"
