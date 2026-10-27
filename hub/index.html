@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WSLC Cluster Cache &amp; Registry Hub</title>
+  <style>
+    :root {
+      --bg: #0b0f19; --card-bg: rgba(23, 30, 48, 0.7); --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(30, 41, 67, 0.85); --text: #f1f5f9; --text-muted: #94a3b8;
+      --blue: #38bdf8; --green: #34d399; --purple: #a78bfa; --amber: #fbbf24; --red: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at 50% 0%, #172554 0%, #0b0f19 75%) fixed;
+      color: var(--text); min-height: 100vh; padding: 2rem 1.5rem; line-height: 1.5;
+    }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    header { margin-bottom: 1.5rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1.25rem; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: flex-end; }
+    .hero-title { font-size: 2rem; font-weight: 700; background: linear-gradient(135deg, #fff 0%, #93c5fd 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-subtitle { color: var(--text-muted); margin-top: .3rem; }
+    .meta { text-align: right; font-size: .8rem; color: var(--text-muted); }
+    .meta .live { display: inline-flex; align-items: center; gap: 6px; color: var(--green); }
+    .meta .live.stale { color: var(--red); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; display: inline-block; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem; }
+    .toolbar input, .toolbar select { background: rgba(0,0,0,.3); border: 1px solid var(--card-border); color: var(--text); border-radius: 8px; padding: 8px 12px; font-size: .9rem; }
+    .toolbar input { flex: 1; min-width: 220px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    .kpi { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 1rem 1.1rem; }
+    .kpi .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+    .kpi .value { font-size: 1.6rem; font-weight: 700; margin-top: .15rem; }
+    .kpi .sub { font-size: .8rem; color: var(--text-muted); }
+    .bar { height: 6px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; margin-top: .5rem; }
+    .bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--green)); }
+    .bar.warn > span { background: linear-gradient(90deg, var(--amber), var(--red)); }
+    .section-title { font-size: 1.2rem; font-weight: 600; margin: 2rem 0 1rem; color: #e2e8f0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.25rem; align-items: start; }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.25rem; backdrop-filter: blur(8px); }
+    .card:hover { background: var(--card-hover); }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .6rem; }
+    .reg-name { font-size: 1.1rem; font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; font-size: .75rem; font-weight: 600; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+    .b-green { background: rgba(52,211,153,.15); color: var(--green); } .b-blue { background: rgba(56,189,248,.15); color: var(--blue); }
+    .b-purple { background: rgba(167,139,250,.15); color: var(--purple); } .b-amber { background: rgba(251,191,36,.15); color: var(--amber); }
+    .b-red { background: rgba(248,113,113,.15); color: var(--red); } .b-gray { background: rgba(148,163,184,.15); color: var(--text-muted); }
+    .desc { font-size: .88rem; color: var(--text-muted); margin-bottom: .75rem; }
+    .info-list { font-size: .82rem; background: rgba(0,0,0,.25); border-radius: 8px; padding: .6rem .85rem; margin-bottom: .75rem; }
+    .info-row { display: flex; justify-content: space-between; gap: 1rem; margin: 3px 0; }
+    .info-label { color: var(--text-muted); } .info-val { color: #cbd5e1; font-weight: 600; text-align: right; }
+    .code-cmd { display: flex; justify-content: space-between; gap: .5rem; align-items: center; background: #060911; border: 1px solid rgba(255,255,255,.06); border-radius: 8px; padding: 8px 10px; font-size: .8rem; color: #a5f3fc; word-break: break-all; }
+    .copy { cursor: pointer; background: none; border: 1px solid var(--card-border); color: var(--text-muted); border-radius: 6px; padding: 2px 8px; font-size: .72rem; }
+    .copy:hover { color: var(--text); }
+    details { margin-top: .75rem; }
+    summary { cursor: pointer; color: var(--blue); font-weight: 600; font-size: .88rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th { text-align: left; padding: 8px 10px; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+    td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
+    td.num, th.num { text-align: right; white-space: nowrap; }
+    .imgtable { margin-top: .6rem; }
+    .chip { display: inline-block; font-size: .72rem; padding: 1px 7px; margin: 1px 3px 1px 0; border-radius: 9999px; background: rgba(56,189,248,.12); color: var(--blue); }
+    .muted { color: var(--text-muted); }
+    .table-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; overflow-x: auto; }
+    .btn-link { display: inline-block; padding: 4px 10px; background: rgba(56,189,248,.1); color: var(--blue); text-decoration: none; border-radius: 6px; font-size: .78rem; font-weight: 600; border: 1px solid rgba(56,189,248,.2); }
+    .btn-link:hover { background: rgba(56,189,248,.2); }
+    a.name { color: var(--blue); text-decoration: none; font-weight: 600; } a.name:hover { text-decoration: underline; }
+    .banner { background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.35); color: #fecaca; padding: .75rem 1rem; border-radius: 10px; margin-bottom: 1rem; display: none; }
+    footer { margin: 2.5rem 0 1rem; text-align: center; font-size: .78rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <div class="hero-title">⚡ WSLC Cluster Cache &amp; Registry Hub</div>
+      <div class="hero-subtitle">Angebot und Nutzung von Pull-Through-Caches, Registries, Paket-Cache und Artefakten</div>
+    </div>
+    <div class="meta">
+      <div><span id="live" class="live"><span class="dot"></span><span id="live-text">lade …</span></span></div>
+      <div id="since"></div>
+      <div class="mono">Endpoints: registry.local / localhost (Distro k8s-cache)</div>
+    </div>
+  </header>
+
+  <div id="banner" class="banner"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="toolbar">
+    <input id="filter" type="search" placeholder="Images, Tags oder Artefakte filtern …" autocomplete="off">
+    <select id="sort" title="Sortierung der Image-Listen">
+      <option value="pulls">Sortierung: meiste Pulls</option>
+      <option value="size">Sortierung: Größe</option>
+      <option value="recent">Sortierung: zuletzt genutzt</option>
+      <option value="name">Sortierung: Name</option>
+      <option value="unused">Sortierung: ungenutzt zuerst</option>
+    </select>
+  </div>
+
+  <div class="section-title">🐳 Container Registries &amp; Mirrors (OCI v2)</div>
+  <div class="grid" id="registries"></div>
+
+  <div class="section-title">📦 Paket-Caches &amp; Artefakt-Dienste</div>
+  <div class="grid" id="services"></div>
+
+  <div class="section-title">📂 Artefakte &amp; Binaries</div>
+  <div class="table-card"><table id="artifacts"></table></div>
+
+  <footer>Statistiken werden alle 30 s vom Dienst <span class="mono">hub-stats</span> erzeugt und hier alle 15 s aktualisiert.
+    Pulls = Tag-Abfragen (HEAD/GET Manifest, je Client/Image/Tag max. 1× pro Minute).</footer>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let data = null;
+let lastOk = 0;
+
+function bytes(n) {
+  if (n === null || n === undefined) return '–';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; let v = Number(n);
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return (i === 0 ? v.toFixed(0) : v.toFixed(v >= 100 ? 0 : 1)) + ' ' + u[i];
+}
+function ago(iso) {
+  if (!iso) return 'nie';
+  const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (s < 90) return 'gerade eben';
+  if (s < 5400) return 'vor ' + Math.round(s / 60) + ' Min';
+  if (s < 129600) return 'vor ' + Math.round(s / 3600) + ' Std';
+  return 'vor ' + Math.round(s / 86400) + ' Tagen';
+}
+const stamp = (iso) => iso ? new Date(iso).toLocaleString('de-DE') : '–';
+const num = (n) => Number(n || 0).toLocaleString('de-DE');
+
+function imageRows(images, filter, sort) {
+  let rows = images.filter((i) => !filter || (i.repo + ' ' + i.tags.map((t) => t.tag).join(' ')).toLowerCase().includes(filter));
+  const size = (i) => Math.max(0, ...i.tags.map((t) => t.size || 0));
+  const newest = (i) => Math.max(0, ...i.tags.map((t) => Date.parse(t.cached_at) || 0), Date.parse(i.last_pull) || 0);
+  const cmp = {
+    pulls: (a, b) => b.pulls - a.pulls || a.repo.localeCompare(b.repo),
+    size: (a, b) => size(b) - size(a),
+    recent: (a, b) => (Date.parse(b.last_pull) || 0) - (Date.parse(a.last_pull) || 0),
+    name: (a, b) => a.repo.localeCompare(b.repo),
+    unused: (a, b) => a.pulls - b.pulls || a.repo.localeCompare(b.repo),
+  }[sort];
+  rows = rows.slice().sort(cmp);
+  const maxPulls = Math.max(1, ...images.map((i) => i.pulls));
+  return rows.map((i) => `
+    <tr>
+      <td><span class="mono">${esc(i.repo)}</span></td>
+      <td>${i.tags.map((t) => `<span class="chip" title="${esc((t.platforms || []).join(', ') || 'Plattformen unbekannt')} · gecacht ${esc(stamp(t.cached_at))}">${esc(t.tag)}${t.size ? ' · ' + bytes(t.size) : ''}</span>`).join('')}</td>
+      <td class="num">${i.pulls ? num(i.pulls) : '<span class="badge b-gray">ungenutzt</span>'}
+        <div class="bar"><span style="width:${Math.round(100 * i.pulls / maxPulls)}%"></span></div></td>
+      <td class="num">${bytes(i.bytes_served)}</td>
+      <td class="num muted">${ago(i.last_pull)}</td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">Keine Treffer</td></tr>';
+}
+
+function renderKpis(d) {
+  const regs = d.registries.filter((r) => r.mode !== 'external');
+  const online = regs.filter((r) => r.online).length;
+  const repos = regs.reduce((a, r) => a + r.images.length, 0);
+  const tags = regs.reduce((a, r) => a + r.images.reduce((x, i) => x + i.tags.length, 0), 0);
+  const pulls = regs.reduce((a, r) => a + r.usage.pulls, 0);
+  const unused = regs.reduce((a, r) => a + r.images.filter((i) => !i.pulls).length, 0);
+  const served = regs.reduce((a, r) => a + r.usage.bytes_served, 0) + d.apt.bytes_served + d.artifacts.bytes_served;
+  const stored = regs.reduce((a, r) => a + r.storage_bytes, 0) + d.apt.storage_bytes + d.artifacts.storage_bytes;
+  const usedPct = d.disk.total ? Math.round(100 * d.disk.used / d.disk.total) : 0;
+  $('#kpis').innerHTML = `
+    <div class="kpi"><div class="label">Dienste online</div><div class="value">${online + (d.apt.online ? 1 : 0) + (d.artifacts.online ? 1 : 0)} / ${regs.length + 2}</div><div class="sub">Registries, APT, Artefakte</div></div>
+    <div class="kpi"><div class="label">Gecachte Images</div><div class="value">${num(repos)}</div><div class="sub">${num(tags)} Tags · ${num(unused)} noch nie gezogen</div></div>
+    <div class="kpi"><div class="label">Pulls gesamt</div><div class="value">${num(pulls)}</div><div class="sub">seit ${esc(stamp(d.since))}</div></div>
+    <div class="kpi"><div class="label">Ausgelieferte Daten</div><div class="value">${bytes(served)}</div><div class="sub">Registries + APT + Artefakte</div></div>
+    <div class="kpi"><div class="label">APT-Ersparnis</div><div class="value">${Math.round(100 * d.apt.saved_ratio)} %</div><div class="sub">${bytes(d.apt.bytes_saved)} nicht aus dem Internet geladen</div></div>
+    <div class="kpi"><div class="label">Cache-Speicher</div><div class="value">${bytes(stored)}</div>
+      <div class="sub">${bytes(d.disk.free)} frei von ${bytes(d.disk.total)}</div><div class="bar ${usedPct > 85 ? 'warn' : ''}"><span style="width:${usedPct}%"></span></div></div>`;
+}
+
+function registryCard(r, filter, sort) {
+  const badge = r.badge || 'blue';
+  if (r.mode === 'external') {
+    return `<div class="card"><div class="card-top"><div class="reg-name">${esc(r.name)}</div><span class="badge b-${esc(badge)}">${esc(r.port)}</span></div>
+      <div class="desc">${esc(r.description)}</div>
+      <div class="info-list"><div class="info-row"><span class="info-label">URL:</span><span class="info-val">${esc(r.url)}</span></div>
+      <div class="info-row"><span class="info-label">Typ:</span><span class="info-val">Enterprise Registry (In-Cluster, keine Cache-Statistik)</span></div></div>
+      <div class="code-cmd mono"><span>${esc(r.example)}</span><button class="copy" data-copy="${esc(r.example)}">kopieren</button></div></div>`;
+  }
+  const u = r.usage; const tags = r.images.reduce((x, i) => x + i.tags.length, 0);
+  const unused = r.images.filter((i) => !i.pulls).length;
+  const status = r.online ? `<span class="badge b-green"><span class="dot"></span> Port ${esc(r.port)}</span>`
+                          : `<span class="badge b-red"><span class="dot"></span> offline (${esc(r.status_text)})</span>`;
+  const open = filter ? 'open' : '';
+  return `<div class="card">
+    <div class="card-top"><div class="reg-name">${esc(r.name)}</div>${status}</div>
+    <div class="desc">${esc(r.description)}</div>
+    <div class="info-list">
+      <div class="info-row"><span class="info-label">${r.mode === 'proxy' ? 'Upstream:' : 'Modus:'}</span><span class="info-val">${esc(r.upstream || 'Read-Write (Push/Pull)')}</span></div>
+      <div class="info-row"><span class="info-label">Images / Tags:</span><span class="info-val">${num(r.images.length)} / ${num(tags)}${unused ? ` <span class="muted">(${unused} ungenutzt)</span>` : ''}</span></div>
+      <div class="info-row"><span class="info-label">Speicher:</span><span class="info-val">${bytes(r.storage_bytes)}</span></div>
+      <div class="info-row"><span class="info-label">Pulls / Requests:</span><span class="info-val">${num(u.pulls)} / ${num(u.requests)}</span></div>
+      <div class="info-row"><span class="info-label">Ausgeliefert:</span><span class="info-val">${bytes(u.bytes_served)}</span></div>
+      <div class="info-row"><span class="info-label">Letzter Zugriff:</span><span class="info-val" title="${esc(stamp(u.last_access))}">${ago(u.last_access)}</span></div>
+      <div class="info-row"><span class="info-label">Clients:</span><span class="info-val">${u.clients.length ? u.clients.map((c) => esc(c.ip) + ' (' + num(c.pulls) + ')').join(', ') : '–'}</span></div>
+    </div>
+    <div class="code-cmd mono"><span>${esc(r.example)}</span><button class="copy" data-copy="${esc(r.example)}">kopieren</button></div>
+    <details ${open}><summary>Angebotene Images anzeigen (${num(r.images.length)})</summary>
+      <table class="imgtable"><thead><tr><th>Image</th><th>Tags (Größe)</th><th class="num">Pulls</th><th class="num">Daten</th><th class="num">Zuletzt</th></tr></thead>
+      <tbody>${imageRows(r.images, filter, sort)}</tbody></table>
+    </details></div>`;
+}
+
+function serviceCards(d) {
+  const a = d.apt, f = d.artifacts;
+  return `
+  <div class="card">
+    <div class="card-top"><div class="reg-name">APT-Cacher-NG</div><span class="badge ${a.online ? 'b-green' : 'b-red'}"><span class="dot"></span> Port ${esc(a.port)}</span></div>
+    <div class="desc">Proxy und Cache für Debian/Ubuntu-Pakete (apt-get) mit HTTPS-Passthrough für NVIDIA- und Docker-Repos.</div>
+    <div class="info-list">
+      <div class="info-row"><span class="info-label">Proxy:</span><span class="info-val">http://registry.local:${esc(a.port)}</span></div>
+      <div class="info-row"><span class="info-label">Cache-Größe:</span><span class="info-val">${bytes(a.storage_bytes)}</span></div>
+      <div class="info-row"><span class="info-label">An Clients geliefert:</span><span class="info-val">${bytes(a.bytes_served)} (${num(a.requests)} Dateien)</span></div>
+      <div class="info-row"><span class="info-label">Aus Internet geladen:</span><span class="info-val">${bytes(a.bytes_fetched)}</span></div>
+      <div class="info-row"><span class="info-label">Ersparnis:</span><span class="info-val">${bytes(a.bytes_saved)} (${Math.round(100 * a.saved_ratio)} %)</span></div>
+      <div class="info-row"><span class="info-label">Letzter Zugriff:</span><span class="info-val">${ago(a.last_access)}</span></div>
+    </div>
+    <div class="bar"><span style="width:${Math.round(100 * a.saved_ratio)}%"></span></div><br>
+    <a class="btn-link" href="http://${location.hostname}:${esc(a.port)}/acng-report.html" target="_blank">📊 Detail-Report öffnen →</a>
+  </div>
+  <div class="card">
+    <div class="card-top"><div class="reg-name">HTTP Artefakt-Server</div><span class="badge ${f.online ? 'b-blue' : 'b-red'}"><span class="dot"></span> Port ${esc(f.port)}</span></div>
+    <div class="desc">Nginx-Bereitstellung statischer Binaries (nerdctl, CNI-Plugins) und YAML-Manifeste für schnelles Bootstrapping.</div>
+    <div class="info-list">
+      <div class="info-row"><span class="info-label">Basis-URL:</span><span class="info-val">http://registry.local:${esc(f.port)}</span></div>
+      <div class="info-row"><span class="info-label">Dateien:</span><span class="info-val">${f.files.filter((x) => x.size !== null).length} (${bytes(f.storage_bytes)})</span></div>
+      <div class="info-row"><span class="info-label">Downloads:</span><span class="info-val">${num(f.requests)} (${bytes(f.bytes_served)})</span></div>
+      <div class="info-row"><span class="info-label">Letzter Download:</span><span class="info-val">${ago(f.last_access)}</span></div>
+    </div>
+  </div>`;
+}
+
+function renderArtifacts(d, filter) {
+  const label = { current: ['b-green', 'aktuell'], stale: ['b-amber', 'nicht mehr konfiguriert'], missing: ['b-red', 'fehlt (wird angefragt)'] };
+  const rows = d.artifacts.files.filter((x) => !filter || x.name.toLowerCase().includes(filter))
+    .map((x) => `<tr>
+      <td>${x.size === null ? `<span class="mono">${esc(x.name)}</span>` : `<a class="name mono" href="${esc(x.name)}">${esc(x.name)}</a>`}</td>
+      <td class="muted">${esc(x.description)}</td>
+      <td><span class="badge ${label[x.status][0]}">${label[x.status][1]}</span></td>
+      <td class="num">${bytes(x.size)}</td>
+      <td class="num">${num(x.downloads)}${x.bytes_served ? ' <span class="muted">(' + bytes(x.bytes_served) + ')</span>' : ''}</td>
+      <td class="num muted">${ago(x.last_download)}</td>
+      <td class="num">${x.size === null ? '' : `<a class="btn-link" href="${esc(x.name)}" download>Download</a>`}</td></tr>`).join('');
+  $('#artifacts').innerHTML = `<thead><tr><th>Datei</th><th>Verwendung</th><th>Status</th><th class="num">Größe</th><th class="num">Downloads</th><th class="num">Zuletzt</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="muted">Keine Treffer</td></tr>'}</tbody>`;
+}
+
+function render() {
+  if (!data) return;
+  const filter = $('#filter').value.trim().toLowerCase();
+  const sort = $('#sort').value;
+  document.title = data.title;
+  $('#since').textContent = 'Statistik seit ' + stamp(data.since);
+  renderKpis(data);
+  const openState = [...document.querySelectorAll('#registries details')].map((d) => d.open);
+  $('#registries').innerHTML = data.registries.map((r) => registryCard(r, filter, sort)).join('');
+  if (!filter) document.querySelectorAll('#registries details').forEach((d, i) => { d.open = !!openState[i]; });
+  $('#services').innerHTML = serviceCards(data);
+  renderArtifacts(data, filter);
+}
+
+async function load() {
+  try {
+    const res = await fetch('stats.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+    lastOk = Date.now();
+    $('#banner').style.display = 'none';
+    render();
+  } catch (e) {
+    $('#banner').style.display = 'block';
+    $('#banner').textContent = 'stats.json nicht verfügbar (' + e.message + '). Läuft der Dienst "hub-stats"? Prüfen mit: systemctl status hub-stats';
+  }
+}
+
+function tick() {
+  const age = data ? (Date.now() - Date.parse(data.generated)) / 1000 : Infinity;
+  const live = $('#live');
+  live.classList.toggle('stale', age > 120);
+  $('#live-text').textContent = data ? (age > 120 ? 'Statistik veraltet (' + ago(data.generated) + ')' : 'Live · aktualisiert ' + new Date(data.generated).toLocaleTimeString('de-DE')) : 'lade …';
+}
+
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('.copy');
+  if (!b) return;
+  const done = () => { b.textContent = 'kopiert ✓'; setTimeout(() => { b.textContent = 'kopieren'; }, 1200); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(b.dataset.copy).then(done);
+  else { const t = document.createElement('textarea'); t.value = b.dataset.copy; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); done(); }
+});
+$('#filter').addEventListener('input', render);
+$('#sort').addEventListener('change', render);
+load(); setInterval(load, 15000); setInterval(tick, 1000);
+</script>
+</body>
+</html>

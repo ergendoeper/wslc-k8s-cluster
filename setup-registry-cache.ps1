@@ -334,13 +334,13 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 need_install=0
-for pkg in docker.io apt-cacher-ng ca-certificates curl; do
+for pkg in docker.io apt-cacher-ng ca-certificates curl python3; do
     dpkg -s "$pkg" >/dev/null 2>&1 || need_install=1
 done
 
 if [ "$need_install" -eq 1 ]; then
     apt-get update
-    apt-get install -y --no-install-recommends docker.io apt-cacher-ng ca-certificates curl
+    apt-get install -y --no-install-recommends docker.io apt-cacher-ng ca-certificates curl python3
     apt-get clean
 else
     echo "Alle Pakete bereits installiert."
@@ -503,209 +503,6 @@ fetch "https://github.com/flannel-io/flannel/releases/download/__FLANNEL__/kube-
 fetch "https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/__NVDP__/deployments/static/nvidia-device-plugin.yml" \
       "nvidia-device-plugin-__NVDP__.yml"
 
-cat > /srv/artifacts/index.html <<'HTML'
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WSLC Cluster Cache & Registry Hub</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0b0f19;
-      --card-bg: rgba(23, 30, 48, 0.7);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --card-hover: rgba(30, 41, 67, 0.85);
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --accent-blue: #38bdf8;
-      --accent-green: #34d399;
-      --accent-purple: #a78bfa;
-      --accent-amber: #fbbf24;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background: radial-gradient(circle at 50% 0%, #172554 0%, #0b0f19 75%);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2.5rem 1.5rem;
-      line-height: 1.5;
-    }
-    .container { max-width: 1200px; margin: 0 auto; }
-    header { margin-bottom: 2.5rem; border-bottom: 1px solid var(--card-border); padding-bottom: 1.5rem; }
-    .hero-title {
-      font-size: 2.2rem; font-weight: 700;
-      background: linear-gradient(135deg, #ffffff 0%, #93c5fd 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      display: flex; align-items: center; gap: 0.75rem;
-    }
-    .hero-subtitle { color: var(--text-muted); font-size: 1.05rem; margin-top: 0.4rem; }
-    .host-pill {
-      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px;
-      background: rgba(56, 189, 248, 0.12); color: var(--accent-blue); font-size: 0.85rem;
-      font-family: 'JetBrains Mono', monospace; margin-top: 0.75rem; border: 1px solid rgba(56, 189, 248, 0.25);
-    }
-    .section-title { font-size: 1.25rem; font-weight: 600; margin: 2rem 0 1rem; display: flex; align-items: center; gap: 0.5rem; color: #e2e8f0; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.25rem; }
-    .card {
-      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.25rem;
-      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease; backdrop-filter: blur(8px);
-      display: flex; flex-direction: column; justify-content: space-between;
-    }
-    .card:hover { background: var(--card-hover); border-color: rgba(255, 255, 255, 0.18); transform: translateY(-2px); }
-    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-    .reg-name { font-size: 1.1rem; font-weight: 600; color: #fff; }
-    .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
-    .badge-green { background: rgba(52, 211, 153, 0.15); color: #34d399; }
-    .badge-blue  { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-    .badge-purple{ background: rgba(167, 139, 250, 0.15); color: #a78bfa; }
-    .badge-amber { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399; }
-    .desc { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem; }
-    .info-list { font-size: 0.85rem; background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 0.85rem; font-family: 'JetBrains Mono', monospace; }
-    .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-    .info-label { color: var(--text-muted); }
-    .info-val { color: #cbd5e1; font-weight: 600; }
-    .code-cmd { background: #060911; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 6px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #38bdf8; overflow-x: auto; white-space: nowrap; }
-    .btn-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(56, 189, 248, 0.1); color: var(--accent-blue); text-decoration: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.2); transition: background 0.15s ease; margin-top: 0.5rem; }
-    .btn-link:hover { background: rgba(56, 189, 248, 0.2); }
-    .artifacts-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; overflow: hidden; }
-    .artifacts-table th { background: rgba(15, 23, 42, 0.8); text-align: left; padding: 10px 14px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 1px solid var(--card-border); }
-    .artifacts-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.9rem; }
-    .artifacts-table tr:last-child td { border-bottom: none; }
-    .artifacts-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
-    .art-link { color: #38bdf8; text-decoration: none; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
-    .art-link:hover { text-decoration: underline; }
-    .art-size { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div class="hero-title">⚡ WSLC Cluster Cache & Registry Hub</div>
-      <div class="hero-subtitle">Zentraler Pull-Through-Cache, OCI-Registries und Artefakt-Server für wslc-k8s-cluster</div>
-      <div class="host-pill">🌐 Endpoints: registry.local / localhost (Cache-Distro: k8s-cache)</div>
-    </header>
-    <div class="section-title">🐳 Container Registries & Mirrors (OCI v2)</div>
-    <div class="grid">
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">Docker Hub Cache</div><span class="badge badge-green"><span class="status-dot"></span> Port 5000</span></div>
-          <div class="desc">Transparenter Pull-Through Cache für Standard-Container-Images. Spart Bandbreite und umgeht Rate-Limits.</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">Upstream:</span><span class="info-val">registry-1.docker.io</span></div>
-            <div class="info-row"><span class="info-label">Typ:</span><span class="info-val">Pull-Through Mirror</span></div>
-          </div>
-        </div>
-        <div class="code-cmd">docker pull localhost:5000/library/alpine</div>
-      </div>
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">Kubernetes Mirror</div><span class="badge badge-blue"><span class="status-dot"></span> Port 5001</span></div>
-          <div class="desc">Spiegel für offizielle Kubernetes-Systemkomponenten (Pause-Container, CoreDNS, Kube-Proxy).</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">Upstream:</span><span class="info-val">registry.k8s.io</span></div>
-            <div class="info-row"><span class="info-label">Typ:</span><span class="info-val">Pull-Through Mirror</span></div>
-          </div>
-        </div>
-        <div class="code-cmd">docker pull localhost:5001/pause:3.10</div>
-      </div>
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">GitHub Registry (GHCR)</div><span class="badge badge-purple"><span class="status-dot"></span> Port 5002</span></div>
-          <div class="desc">Pull-Through Cache für GitHub Container Registry (Open-Source Controller, Tools, Operators).</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">Upstream:</span><span class="info-val">ghcr.io</span></div>
-            <div class="info-row"><span class="info-label">Typ:</span><span class="info-val">Pull-Through Mirror</span></div>
-          </div>
-        </div>
-        <div class="code-cmd">docker pull localhost:5002/k8sgpt-ai/k8sgpt</div>
-      </div>
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">NVIDIA Registry (NVCR)</div><span class="badge badge-green"><span class="status-dot"></span> Port 5003</span></div>
-          <div class="desc">Spiegel für NVIDIA AI & GPU-Container sowie den Kubernetes Device Plugin Operator.</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">Upstream:</span><span class="info-val">nvcr.io</span></div>
-            <div class="info-row"><span class="info-label">Typ:</span><span class="info-val">Pull-Through Mirror</span></div>
-          </div>
-        </div>
-        <div class="code-cmd">docker pull localhost:5003/nvidia/k8s-device-plugin</div>
-      </div>
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">Local Private Registry</div><span class="badge badge-amber"><span class="status-dot"></span> Port 5010</span></div>
-          <div class="desc">Vollwertige, beschreibbare OCI-Registry für eigene Entwicklungs-Builds (Kaniko, nerdctl, Docker).</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">Modus:</span><span class="info-val">Read-Write (Push/Pull)</span></div>
-            <div class="info-row"><span class="info-label">Zugriff:</span><span class="info-val">registry.local:5010</span></div>
-          </div>
-        </div>
-        <div class="code-cmd">docker push localhost:5010/myquality/app:v1.0</div>
-      </div>
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">Quay Platform Registry</div><span class="badge badge-blue"><span class="status-dot"></span> Port 80 / 443</span></div>
-          <div class="desc">In-Cluster Enterprise-Registry mit Trivy-Sicherheitsscans, RBAC, Team-Organisationen und Helm-Charts.</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">URL:</span><span class="info-val">quay.dev.myquality.local</span></div>
-            <div class="info-row"><span class="info-label">Typ:</span><span class="info-val">Enterprise Registry (In-Cluster)</span></div>
-          </div>
-        </div>
-        <div class="code-cmd">docker pull quay.dev.myquality.local/myquality/n8n:v2.0.6</div>
-      </div>
-    </div>
-    <div class="section-title">📦 Paket-Caches & Artefakt-Dienste</div>
-    <div class="grid">
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">APT-Cacher-NG</div><span class="badge badge-green"><span class="status-dot"></span> Port 3142</span></div>
-          <div class="desc">Zentraler Proxy und Cache für Debian/Ubuntu-Pakete (apt-get) mit HTTPS-Passthrough für NVIDIA & Docker Repos.</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">Proxy:</span><span class="info-val">http://registry.local:3142</span></div>
-            <div class="info-row"><span class="info-label">Dashboard:</span><span class="info-val">Statistik & Report</span></div>
-          </div>
-        </div>
-        <a class="btn-link" href="http://localhost:3142/acng-report.html" target="_blank">📊 Cache-Report & Statistiken öffnen →</a>
-      </div>
-      <div class="card">
-        <div>
-          <div class="card-top"><div class="reg-name">HTTP Artefakt-Server</div><span class="badge badge-blue"><span class="status-dot"></span> Port 8080</span></div>
-          <div class="desc">Nginx-basierte Bereitstellung statischer Binaries (nerdctl, CNI Plugins) und YAML-Manifeste für schnelles Bootstrapping.</div>
-          <div class="info-list">
-            <div class="info-row"><span class="info-label">Basis-URL:</span><span class="info-val">http://registry.local:8080</span></div>
-            <div class="info-row"><span class="info-label">Pfad:</span><span class="info-val">/srv/artifacts</span></div>
-          </div>
-        </div>
-        <div class="code-cmd">curl -O http://localhost:8080/nerdctl-__NERDCTL__-linux-amd64.tar.gz</div>
-      </div>
-    </div>
-    <div class="section-title">📂 Lokale Cluster-Artefakte & Binaries</div>
-    <table class="artifacts-table">
-      <thead><tr><th>Datei / Artefakt</th><th>Größe</th><th>Verwendungszweck</th><th>Aktion</th></tr></thead>
-      <tbody>
-HTML
-
-for f in /srv/artifacts/*; do
-    bn=$(basename "$f")
-    if [ "$bn" != "index.html" ]; then
-        sz=$(ls -lh "$f" | awk '{print $5}')
-        echo "        <tr><td><a class="art-link" href="$bn">$bn</a></td><td class="art-size">$sz</td><td>Cluster-Komponente / Node-Binary</td><td><a class="btn-link" style="margin:0; padding:4px 10px; font-size:0.75rem;" href="$bn" download>Download</a></td></tr>" >> /srv/artifacts/index.html
-    fi
-done
-
-cat >> /srv/artifacts/index.html <<'HTML'
-      </tbody>
-    </table>
-  </div>
-</body>
-</html>
-HTML
-
 chmod -R a+r /srv/artifacts
 echo "Inhalt des Artefakt-Caches:"
 ls -lh /srv/artifacts | sed 's/^/  /'
@@ -720,6 +517,110 @@ ls -lh /srv/artifacts | sed 's/^/  /'
     Invoke-InDistro -Script $artifactScript
     Write-Ok 'Artefakt-Cache befuellt'
 }
+
+# ----------------------------------------------------------------------------
+# 6b. Hub-Dashboard und Statistik-Dienst
+# ----------------------------------------------------------------------------
+
+Write-Step '6b. Hub-Dashboard und Statistik-Dienst installieren'
+
+function Send-BytesToDistro {
+    # Grosse Inhalte in Bloecken uebertragen (Kommandozeilenlimit von CreateProcess).
+    param([byte[]] $Bytes, [string] $RemotePath, [switch] $Executable)
+
+    $b64 = [Convert]::ToBase64String($Bytes)
+    $tmp = "$RemotePath.b64"
+    & wsl.exe -d $DistroName -u root -- bash -c "mkdir -p `$(dirname '$RemotePath') && : > '$tmp'"
+    if ($LASTEXITCODE -ne 0) { throw "Konnte $tmp in der Distro nicht anlegen." }
+    for ($i = 0; $i -lt $b64.Length; $i += 8000) {
+        $chunk = $b64.Substring($i, [Math]::Min(8000, $b64.Length - $i))
+        & wsl.exe -d $DistroName -u root -- bash -c "printf '%s' '$chunk' >> '$tmp'"
+        if ($LASTEXITCODE -ne 0) { throw "Uebertragung nach $RemotePath fehlgeschlagen." }
+    }
+    $chmod = if ($Executable) { "chmod +x '$RemotePath' && " } else { '' }
+    & wsl.exe -d $DistroName -u root -- bash -c "base64 -d '$tmp' > '$RemotePath' && rm -f '$tmp' && ${chmod}chmod a+r '$RemotePath'"
+    if ($LASTEXITCODE -ne 0) { throw "Dekodieren von $RemotePath fehlgeschlagen." }
+}
+
+$hubDir = Join-Path $script:ScriptRoot 'hub'
+foreach ($f in 'hub-stats.py', 'index.html') {
+    if (-not (Test-Path (Join-Path $hubDir $f))) { throw "Datei fehlt: $(Join-Path $hubDir $f)" }
+}
+
+$hubConfig = [ordered]@{
+    title     = 'WSLC Cluster Cache & Registry Hub'
+    ttl_hours = 336
+    registries = @(
+        [ordered]@{ id = 'dockerhub'; name = 'Docker Hub Cache'; container = 'registry-dockerhub'; volume = 'dockerhub'; port = $PortDockerHub
+            mode = 'proxy'; upstream = 'registry-1.docker.io'; badge = 'green'
+            description = 'Transparenter Pull-Through Cache fuer Standard-Container-Images. Spart Bandbreite und umgeht Rate-Limits.'
+            example = "docker pull localhost:${PortDockerHub}/library/alpine" },
+        [ordered]@{ id = 'k8s'; name = 'Kubernetes Mirror'; container = 'registry-k8s'; volume = 'k8s'; port = $PortK8s
+            mode = 'proxy'; upstream = 'registry.k8s.io'; badge = 'blue'
+            description = 'Spiegel fuer offizielle Kubernetes-Systemkomponenten (Pause-Container, CoreDNS, Kube-Proxy).'
+            example = "docker pull localhost:${PortK8s}/pause:3.10" },
+        [ordered]@{ id = 'ghcr'; name = 'GitHub Registry (GHCR)'; container = 'registry-ghcr'; volume = 'ghcr'; port = $PortGhcr
+            mode = 'proxy'; upstream = 'ghcr.io'; badge = 'purple'
+            description = 'Pull-Through Cache fuer die GitHub Container Registry (Open-Source Controller, Tools, Operators).'
+            example = "docker pull localhost:${PortGhcr}/k8sgpt-ai/k8sgpt" },
+        [ordered]@{ id = 'nvcr'; name = 'NVIDIA Registry (NVCR)'; container = 'registry-nvcr'; volume = 'nvcr'; port = $PortNvcr
+            mode = 'proxy'; upstream = 'nvcr.io'; badge = 'green'
+            description = 'Spiegel fuer NVIDIA AI- und GPU-Container sowie den Kubernetes Device Plugin.'
+            example = "docker pull localhost:${PortNvcr}/nvidia/k8s-device-plugin" },
+        [ordered]@{ id = 'local'; name = 'Local Private Registry'; container = 'registry-local'; volume = 'local'; port = $PortLocal
+            mode = 'local'; upstream = $null; badge = 'amber'
+            description = 'Beschreibbare OCI-Registry fuer eigene Entwicklungs-Builds (Kaniko, nerdctl, Docker).'
+            example = "docker push localhost:${PortLocal}/myquality/app:v1.0" },
+        [ordered]@{ id = 'quay'; name = 'Quay Platform Registry'; mode = 'external'; port = 'Port 80 / 443'; badge = 'blue'
+            url = 'quay.dev.myquality.local'
+            description = 'In-Cluster Enterprise-Registry mit Trivy-Sicherheitsscans, RBAC, Team-Organisationen und Helm-Charts.'
+            example = 'docker pull quay.dev.myquality.local/myquality/n8n:v2.0.6' }
+    )
+    apt       = [ordered]@{ port = $PortApt }
+    artifacts = [ordered]@{
+        port      = $PortArtifacts
+        container = 'artifact-cache'
+        expected  = @(
+            "nerdctl-$NerdctlVersion-linux-amd64.tar.gz",
+            "cni-plugins-linux-amd64-$CniPluginsVersion.tgz",
+            "kube-flannel-$FlannelVersion.yml",
+            "nvidia-device-plugin-$NvidiaDevicePluginVersion.yml")
+    }
+}
+
+Send-BytesToDistro -Bytes (Get-Content -LiteralPath (Join-Path $hubDir 'hub-stats.py') -Raw -Encoding UTF8 | ForEach-Object { [Text.Encoding]::UTF8.GetBytes($_.Replace("`r`n", "`n")) }) -RemotePath '/usr/local/bin/hub-stats.py' -Executable
+Send-BytesToDistro -Bytes ([IO.File]::ReadAllBytes((Join-Path $hubDir 'index.html'))) -RemotePath '/srv/artifacts/index.html'
+Send-BytesToDistro -Bytes ([Text.Encoding]::UTF8.GetBytes(($hubConfig | ConvertTo-Json -Depth 6))) -RemotePath '/etc/hub-stats.json'
+
+$hubServiceScript = @'
+#!/bin/bash
+set -euo pipefail
+cat > /etc/systemd/system/hub-stats.service <<'UNIT'
+[Unit]
+Description=WSLC Cache Hub Statistik-Dienst
+After=docker.service
+Wants=docker.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/hub-stats.py --loop 30
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable hub-stats >/dev/null 2>&1
+systemctl restart hub-stats
+for i in $(seq 1 30); do
+    [ -s /srv/artifacts/stats.json ] && break
+    sleep 1
+done
+[ -s /srv/artifacts/stats.json ] || { echo "stats.json wurde nicht erzeugt"; journalctl -u hub-stats -n 20 --no-pager; exit 1; }
+echo "hub-stats aktiv, stats.json erzeugt"
+'@
+Invoke-InDistro -Script $hubServiceScript
+Write-Ok "Dashboard mit Live-Statistik unter http://localhost:$PortArtifacts/"
 
 # ----------------------------------------------------------------------------
 # 7. Ports nach aussen veroeffentlichen

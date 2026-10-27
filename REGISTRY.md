@@ -43,6 +43,8 @@ Dadurch werden Container-Images, APT-Pakete und Binär-Artefakte (`nerdctl`, `cn
 | `setup-registry-cache.ps1` | Einmal-Installer für Windows 11 (erstellt WSL-Distro `k8s-cache`, startet Container, richtet NGINX & apt-cacher-ng ein, konfiguriert Firewall & Portproxy, erzeugt Konfiguration). |
 | `sync-registry-portproxy.ps1` | Startet die Distro bei Bedarf und stellt sicher, dass die Windows `netsh portproxy`-Regeln exakt auf die aktuelle IP von `k8s-cache` zeigen. Wird auch im E2E-Workflow (`run-e2e.bat`) automatisch ausgeführt. |
 | `registry-mirrors.sh` | Gast-seitiges Shell-Modul für die wslc-VM. Konfiguriert `/etc/containerd/certs.d/`, `/etc/hosts` und `/etc/apt/apt.conf.d/01proxy` in Node-Containern. |
+| `hub\index.html` | Dashboard-UI (statisch, lädt alle 15 s `stats.json`). Wird nach `/srv/artifacts/index.html` kopiert. |
+| `hub\hub-stats.py` | Statistik-Dienst (systemd `hub-stats` in der Distro, alle 30 s). Liest Registry-Dateisystem, Docker-Logs, apt-cacher- und nginx-Logs und schreibt `/srv/artifacts/stats.json`. Konfiguration: `/etc/hub-stats.json` (vom Installer erzeugt). |
 | `cluster-config.registry.ps1` | Wird vom Installer automatisch generiert (git-ignoriert). Enthält die ermittelten IPs und Port-Zuweisungen. |
 
 ---
@@ -147,6 +149,10 @@ wslc system session run sh -lc "curl -sS -I http://172.24.112.1:8080/"
 # WSLC Cluster Cache & Registry Hub Web-Dashboard im Browser öffnen:
 start http://localhost:8080
 
+# Rohdaten des Dashboards und Status des Statistik-Dienstes:
+curl http://localhost:8080/stats.json
+wsl -d k8s-cache -u root -- systemctl status hub-stats
+
 # APT-Cacher-NG Web-Statistik im Browser öffnen:
 start http://localhost:3142/acng-report.html
 
@@ -156,6 +162,8 @@ wsl -d k8s-cache -- docker logs -f registry-k8s
 # Speicherplatzbelegung der Registries:
 wsl -d k8s-cache -- du -sh /srv/registry/*
 ```
+
+**Was das Dashboard zeigt:** Pro Registry die gecachten Images/Tags mit Größe, Plattformen, Cache-Zeitpunkt, Pull-Anzahl und letztem Pull (filter- und sortierbar); APT-Ersparnis (aus dem Internet geladen vs. an Clients ausgeliefert); Artefakte mit Status (vorhanden / veraltet / fehlt, aber angefragt) und Downloads; Speicherbelegung. Pull-Zähler beginnen mit der Installation des Dienstes („Statistik seit …“); HEAD+GET desselben Tags innerhalb von 60 s zählen als ein Pull. Bereits gecachte, aber nie gezogene Images werden als „0 Pulls“ markiert.
 
 ### 4. Garbage Collection / Bereinigung
 

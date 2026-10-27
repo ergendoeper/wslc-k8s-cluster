@@ -23,6 +23,8 @@ This repository bootstraps a production-like local multi-node Kubernetes cluster
 | `cluster-config.ps1` | Host | Central configuration file defining versions, topology, network, GPU, and paths. |
 | `setup-registry-cache.ps1` | Host (Admin) | Sets up the `k8s-cache` WSL distro, pull-through registries, NGINX artifact cache, and firewall/portproxy rules. |
 | `sync-registry-portproxy.ps1` | Host | Synchronizes Windows `netsh portproxy` rules with the dynamic IP of `k8s-cache`. |
+| `wslc-common.ps1` | Host | Shared helpers (`Invoke-WslcCommand` with failure detection, `Send-WslcFile` chunked upload with SHA256 check) dot-sourced by all cluster scripts. |
+| `hub\index.html`, `hub\hub-stats.py` | Cache distro | Hub dashboard UI and the stats service (`hub-stats.service`) that writes `stats.json` (offered images/artifacts and their usage). |
 | `create-cluster.ps1` | Host | Uploads scripts to `wslc`, executes node bootstrap, and exports kubeconfig to `%USERPROFILE%\.kube\config`. |
 | `setup-nodes.sh` | wslc Guest | Main bootstrap script (runtime setup, image pulls, mirror configuration, `kubeadm init`/`join`, Flannel CNI, NVIDIA plugin). |
 | `registry-mirrors.sh` | wslc Guest | Configures containerd `hosts.toml`, `/etc/hosts`, and APT proxy settings inside node containers. |
