@@ -156,6 +156,10 @@ Custom regex managers in Renovate inspect `cluster-config.ps1` and `setup-regist
 ### 3. Flannel CNI plugin missing
 - `setup-nodes.sh` downloads and deploys `cni-plugins` and the Flannel CNI plugin binary to `/opt/cni/bin/` on all nodes prior to network startup.
 
+### 4. "Fetched kubeconfig is empty or invalid" / `ERROR_INVALID_HANDLE`
+- Cause: `wslc` fails on very long command lines, so a script uploaded in one piece never reached the VM.
+- `create-cluster.ps1` now uploads `setup-nodes.sh` and `registry-mirrors.sh` in 6 KB base64 chunks (`Send-WslcFile`).
+- Run the scripts from a real console window; a host without a console can make longer `wslc` commands fail with `ERROR_INVALID_HANDLE`.
 ---
 
 ## License

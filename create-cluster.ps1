@@ -77,6 +77,21 @@ function Invoke-WslcCommand {
     }
 }
 
+# Uploads a local file in small base64 chunks (large command lines make wslc fail with ERROR_INVALID_HANDLE).
+function Send-WslcFile {
+    param ([string]$LocalPath, [string]$RemotePath, [bool]$Executable = $false)
+
+    $b64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($LocalPath))
+    $chunkSize = 6000
+    Invoke-WslcCommand -Command "rm -f $RemotePath.b64; : > $RemotePath.b64; echo '=== CHUNK_OK ==='" -Sentinel "=== CHUNK_OK ===" | Out-Null
+    for ($i = 0; $i -lt $b64.Length; $i += $chunkSize) {
+        $chunk = $b64.Substring($i, [Math]::Min($chunkSize, $b64.Length - $i))
+        Invoke-WslcCommand -Command "printf '%s' '$chunk' >> $RemotePath.b64 && echo '=== CHUNK_OK ==='" -Sentinel "=== CHUNK_OK ===" -CaptureOutput $true | Out-Null
+    }
+    $chmod = if ($Executable) { "chmod +x $RemotePath && " } else { "" }
+    Invoke-WslcCommand -Command "base64 -d $RemotePath.b64 > $RemotePath && rm -f $RemotePath.b64 && ${chmod}echo '=== UPLOAD_OK ==='" -Sentinel "=== UPLOAD_OK ===" | Out-Null
+}
+
 Write-Host "=== Starting Kubernetes Cluster Setup using wslc ===" -ForegroundColor Green
 Write-Host "  K8S Version    : $K8S_VERSION"
 Write-Host "  Node Image Tag : $NODE_IMAGE_TAG"
@@ -92,24 +107,16 @@ if (-not (Test-Path $setupScriptPath)) {
     exit 1
 }
 
-Write-Host "Encoding setup-nodes.sh to base64..."
-$scriptBytes = [System.IO.File]::ReadAllBytes($setupScriptPath)
-$base64Script = [Convert]::ToBase64String($scriptBytes)
-
 # 2. Write setup-nodes.sh into the wslc VM
 Write-Host "Uploading setup-nodes.sh to wslc VM..."
-$writeCommand = "echo '$base64Script' | base64 -d > /tmp/setup-nodes.sh && chmod +x /tmp/setup-nodes.sh && echo '=== UPLOAD_SUCCESS ==='"
-Invoke-WslcCommand -Command $writeCommand -Sentinel "=== UPLOAD_SUCCESS ==="
+Send-WslcFile -LocalPath $setupScriptPath -RemotePath "/tmp/setup-nodes.sh" -Executable $true
 
 # 2b. Upload registry-mirrors.sh (nur wenn der Cache aktiv ist)
 if ($REGISTRY_ENABLE) {
     $mirrorScriptPath = Join-Path $PSScriptRoot "registry-mirrors.sh"
     if (Test-Path $mirrorScriptPath) {
         Write-Host "Uploading registry-mirrors.sh to wslc VM..."
-        $mirrorBytes  = [System.IO.File]::ReadAllBytes($mirrorScriptPath)
-        $mirrorBase64 = [Convert]::ToBase64String($mirrorBytes)
-        $writeMirror  = "echo '$mirrorBase64' | base64 -d > /tmp/registry-mirrors.sh && echo '=== MIRROR_UPLOAD_OK ==='"
-        Invoke-WslcCommand -Command $writeMirror -Sentinel "=== MIRROR_UPLOAD_OK ==="
+        Send-WslcFile -LocalPath $mirrorScriptPath -RemotePath "/tmp/registry-mirrors.sh"
     }
     else {
         Write-Warning "registry-mirrors.sh nicht gefunden neben create-cluster.ps1 - Registry-Cache wird uebersprungen."
