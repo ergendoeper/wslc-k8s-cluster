@@ -167,6 +167,16 @@ Custom regex managers in Renovate inspect `cluster-config.ps1` and `cache/setup-
 - Cause: `wslc` fails on very long command lines, so a script uploaded in one piece never reached the VM.
 - `create-cluster.ps1` now uploads `setup-nodes.sh` and `registry-mirrors.sh` in 6 KB base64 chunks (`Send-WslcFile`).
 - Run the scripts from a real console window; a host without a console can make longer `wslc` commands fail with `ERROR_INVALID_HANDLE`.
+
+### 5. `ERROR_SHARING_VIOLATION` on every `wslc system session run`
+- Cause: an orphaned elevated session (`wslc-cli-admin-<user>`, see `wslc system session list`) blocks the normal session. Mixing elevated and non-elevated shells creates it.
+- `run-e2e.bat` detects this in step 2 and aborts with the fix. In an **Administrator** console run:
+  ```powershell
+  wslc --session wslc-cli-admin-<user> system session terminate
+  wsl --shutdown
+  ```
+- Afterwards always use the same privilege level (elevated or not) for all runs.
+
 ---
 
 ## License

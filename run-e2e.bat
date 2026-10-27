@@ -24,6 +24,16 @@ if errorlevel 1 goto :fail
 
 echo [E2E] Step 2/8 - Reset wslc session
 wslc system session terminate >nul 2>&1
+wslc system session list 2>nul | findstr /i /c:"wslc-cli-admin" >nul
+if not errorlevel 1 (
+    echo [E2E] FEHLER: Es laeuft noch eine erhoehte wslc-Sitzung ^(wslc-cli-admin-*^), die die normale Sitzung blockiert
+    echo [E2E]         ^(ERROR_SHARING_VIOLATION^). Bitte in einer ADMINISTRATOR-Konsole ausfuehren und danach neu starten:
+    echo.
+    echo     wslc --session wslc-cli-admin-%USERNAME% system session terminate
+    echo     wsl --shutdown
+    echo.
+    goto :fail
+)
 if not exist "%ROOT%cluster-config.registry.ps1" (
     wsl --shutdown >nul 2>&1
 )
