@@ -14,59 +14,7 @@ if (-not (Test-Path $Config)) {
 }
 . $Config
 
-# Invoke a command inside the wslc VM via a bash login shell.
-# Waits until the sentinel string appears in stdout, then kills the process.
-# This is required because wslc.exe session run does not exit on its own.
-function Invoke-WslcCommand {
-    param (
-        [string]$Command,
-        [string]$Sentinel = "=== DONE ===",
-        [bool]$CaptureOutput = $false,
-        [int]$TimeoutSeconds = 60
-    )
-
-    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $processInfo.FileName = "wslc.exe"
-    $processInfo.Arguments = "system session run bash -c ""$Command; echo '$Sentinel' 2>&1"""
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.RedirectStandardError = $false
-    $processInfo.UseShellExecute = $false
-    $processInfo.CreateNoWindow = $true
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $processInfo
-
-    $outputLines = New-Object System.Collections.Generic.List[string]
-    $process.Start() | Out-Null
-
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-
-    while ([DateTime]::UtcNow -lt $deadline) {
-        if ($process.StandardOutput.EndOfStream -and $process.HasExited) { break }
-        $line = $process.StandardOutput.ReadLine()
-        if ($null -ne $line) {
-            if ($CaptureOutput) {
-                $outputLines.Add($line)
-            } else {
-                Write-Host $line
-            }
-            if ($line.Contains($Sentinel)) {
-                break
-            }
-        } else {
-            Start-Sleep -Milliseconds 50
-        }
-    }
-
-    if (-not $process.HasExited) {
-        try { $process.Kill() } catch { }
-    }
-    $process.WaitForExit()
-
-    if ($CaptureOutput) {
-        return $outputLines
-    }
-}
+. (Join-Path $PSScriptRoot "wslc-common.ps1")
 
 Write-Host "=== Deleting Kubernetes Cluster Resources in wslc VM ===" -ForegroundColor Yellow
 

@@ -12,64 +12,7 @@ if (-not (Test-Path $Config)) {
 }
 . $Config
 
-function Invoke-WslcCommand {
-    param (
-        [string]$Command,
-        [string]$Sentinel,
-        [bool]$CaptureOutput = $false
-    )
-
-    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $processInfo.FileName = "wslc.exe"
-    $processInfo.Arguments = "system session run bash -c ""$Command 2>&1"""
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.RedirectStandardError = $false
-    $processInfo.UseShellExecute = $false
-    $processInfo.CreateNoWindow = $true
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $processInfo
-    
-    $outputLines = New-Object System.Collections.Generic.List[string]
-    $process.Start() | Out-Null
-
-    while (-not $process.HasExited) {
-        $line = $process.StandardOutput.ReadLine()
-        if ($line -ne $null) {
-            if (-not $CaptureOutput) {
-                Write-Host $line
-            } else {
-                $outputLines.Add($line)
-            }
-
-            if ($Sentinel -and $line.Contains($Sentinel)) {
-                if (-not $process.HasExited) {
-                    try {
-                        $process.Kill()
-                    } catch {
-                        # Ignore process-race errors (already exited / access denied during teardown).
-                    }
-                }
-                break
-            }
-        }
-        Start-Sleep -Milliseconds 20
-    }
-
-    if (-not $process.HasExited) {
-        try {
-            $process.Kill()
-        } catch {
-            # Ignore process-race errors (already exited / access denied during teardown).
-        }
-    }
-
-    $process.WaitForExit()
-
-    if ($CaptureOutput) {
-        return $outputLines
-    }
-}
+. (Join-Path $PSScriptRoot "wslc-common.ps1")
 
 Write-Host "=== Starting Cluster Package & Security Updates ===" -ForegroundColor Green
 
@@ -80,24 +23,15 @@ if (-not (Test-Path $updateScriptPath)) {
     exit 1
 }
 
-Write-Host "Encoding update-nodes.sh to base64..."
-$scriptBytes = [System.IO.File]::ReadAllBytes($updateScriptPath)
-$base64Script = [Convert]::ToBase64String($scriptBytes)
-
-# 2. Write update-nodes.sh into the wslc VM
 Write-Host "Uploading update-nodes.sh to wslc VM..."
-$writeCommand = "echo '$base64Script' | base64 -d > /tmp/update-nodes.sh && chmod +x /tmp/update-nodes.sh && echo '=== UPLOAD_SUCCESS ==='"
-Invoke-WslcCommand -Command $writeCommand -Sentinel "=== UPLOAD_SUCCESS ==="
+Send-WslcFile -LocalPath $updateScriptPath -RemotePath "/tmp/update-nodes.sh" -Executable $true
 
 # 2b. Upload registry-mirrors.sh (nur wenn der Cache aktiv ist)
 if ($REGISTRY_ENABLE) {
     $mirrorScriptPath = Join-Path $PSScriptRoot "registry-mirrors.sh"
     if (Test-Path $mirrorScriptPath) {
         Write-Host "Uploading registry-mirrors.sh to wslc VM..."
-        $mirrorBytes  = [System.IO.File]::ReadAllBytes($mirrorScriptPath)
-        $mirrorBase64 = [Convert]::ToBase64String($mirrorBytes)
-        $writeMirror  = "echo '$mirrorBase64' | base64 -d > /tmp/registry-mirrors.sh && echo '=== MIRROR_UPLOAD_OK ==='"
-        Invoke-WslcCommand -Command $writeMirror -Sentinel "=== MIRROR_UPLOAD_OK ==="
+        Send-WslcFile -LocalPath $mirrorScriptPath -RemotePath "/tmp/registry-mirrors.sh"
     }
     else {
         Write-Warning "registry-mirrors.sh nicht gefunden neben update-cluster.ps1 - Registry-Cache wird uebersprungen."
@@ -115,7 +49,7 @@ $runCommand = "export CONTROL_PLANE_NAME='$CONTROL_PLANE_NAME'; " +
               "export REGISTRY_IP='$REGISTRY_IP'; " +
               "export APT_PROXY='$APT_PROXY'; " +
               "/tmp/update-nodes.sh"
-Invoke-WslcCommand -Command $runCommand -Sentinel "=== UPDATE SUCCESS ==="
+Invoke-WslcCommand -Command $runCommand -Sentinel "=== UPDATE SUCCESS ===" -Required
 
 Write-Host "=== OS Update Complete! ===" -ForegroundColor Green
 

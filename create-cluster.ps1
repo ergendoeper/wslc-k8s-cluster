@@ -20,77 +20,7 @@ if (-not $NODE_IMAGE_TAG) {
 }
 $IMAGE = "${NODE_IMAGE}:${NODE_IMAGE_TAG}"
 
-# Function to invoke a command inside the wslc VM via bash, waiting for a sentinel line.
-function Invoke-WslcCommand {
-    param (
-        [string]$Command,
-        [string]$Sentinel,
-        [bool]$CaptureOutput = $false,
-        [int]$TimeoutSeconds = 1800
-    )
-
-    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $processInfo.FileName = "wslc.exe"
-    $processInfo.Arguments = "system session run bash -c ""$Command 2>&1"""
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.RedirectStandardError = $false
-    $processInfo.UseShellExecute = $false
-    $processInfo.CreateNoWindow = $true
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $processInfo
-
-    $outputLines = New-Object System.Collections.Generic.List[string]
-
-    $process.Start() | Out-Null
-
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-
-    while ([DateTime]::UtcNow -lt $deadline) {
-        if ($process.StandardOutput.EndOfStream -and $process.HasExited) { break }
-        $line = $process.StandardOutput.ReadLine()
-        if ($null -ne $line) {
-            if (-not $CaptureOutput) {
-                Write-Host $line
-            } else {
-                $outputLines.Add($line)
-            }
-
-            if ($Sentinel -and $line.Contains($Sentinel)) {
-                if (-not $process.HasExited) {
-                    try { $process.Kill() } catch { }
-                }
-                break
-            }
-        } else {
-            Start-Sleep -Milliseconds 20
-        }
-    }
-
-    if (-not $process.HasExited) {
-        try { $process.Kill() } catch { }
-    }
-    $process.WaitForExit()
-
-    if ($CaptureOutput) {
-        return $outputLines
-    }
-}
-
-# Uploads a local file in small base64 chunks (large command lines make wslc fail with ERROR_INVALID_HANDLE).
-function Send-WslcFile {
-    param ([string]$LocalPath, [string]$RemotePath, [bool]$Executable = $false)
-
-    $b64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($LocalPath))
-    $chunkSize = 6000
-    Invoke-WslcCommand -Command "rm -f $RemotePath.b64; : > $RemotePath.b64; echo '=== CHUNK_OK ==='" -Sentinel "=== CHUNK_OK ===" | Out-Null
-    for ($i = 0; $i -lt $b64.Length; $i += $chunkSize) {
-        $chunk = $b64.Substring($i, [Math]::Min($chunkSize, $b64.Length - $i))
-        Invoke-WslcCommand -Command "printf '%s' '$chunk' >> $RemotePath.b64 && echo '=== CHUNK_OK ==='" -Sentinel "=== CHUNK_OK ===" -CaptureOutput $true | Out-Null
-    }
-    $chmod = if ($Executable) { "chmod +x $RemotePath && " } else { "" }
-    Invoke-WslcCommand -Command "base64 -d $RemotePath.b64 > $RemotePath && rm -f $RemotePath.b64 && ${chmod}echo '=== UPLOAD_OK ==='" -Sentinel "=== UPLOAD_OK ===" | Out-Null
-}
+. (Join-Path $PSScriptRoot "wslc-common.ps1")
 
 Write-Host "=== Starting Kubernetes Cluster Setup using wslc ===" -ForegroundColor Green
 Write-Host "  K8S Version    : $K8S_VERSION"
@@ -159,7 +89,7 @@ $runCommand = "export K8S_VERSION='$K8S_VERSION'; " +
               "export APT_PROXY='$APT_PROXY'; " +
               "export ARTIFACT_PROXY='$ARTIFACT_PROXY'; " +
               "/tmp/setup-nodes.sh"
-Invoke-WslcCommand -Command $runCommand -Sentinel "=== SUCCESS ==="
+Invoke-WslcCommand -Command $runCommand -Sentinel "=== SUCCESS ===" -Required
 
 # 4. Fetch the kubeconfig from the VM
 Write-Host "Fetching kubeconfig from VM..." -ForegroundColor Yellow

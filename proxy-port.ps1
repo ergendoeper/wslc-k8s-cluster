@@ -20,53 +20,7 @@ $VmRelayPort    = $VM_RELAY_PORT
 $HostProxyName  = $HOST_PROXY_NAME
 $VmRelayName    = $VM_RELAY_NAME
 
-# Invoke a command inside the wslc VM via bash, waiting for a sentinel line.
-function Invoke-WslcCommand {
-    param (
-        [string]$Command,
-        [string]$Sentinel = "=== DONE ===",
-        [bool]$CaptureOutput = $false,
-        [int]$TimeoutSeconds = 30
-    )
-
-    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $processInfo.FileName = "wslc.exe"
-    $processInfo.Arguments = "system session run bash -c ""$Command; echo '$Sentinel' 2>&1"""
-    $processInfo.RedirectStandardOutput = $true
-    $processInfo.RedirectStandardError = $false
-    $processInfo.UseShellExecute = $false
-    $processInfo.CreateNoWindow = $true
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $processInfo
-
-    $outputLines = New-Object System.Collections.Generic.List[string]
-    $process.Start() | Out-Null
-
-    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
-
-    while ([DateTime]::UtcNow -lt $deadline) {
-        if ($process.StandardOutput.EndOfStream -and $process.HasExited) { break }
-        $line = $process.StandardOutput.ReadLine()
-        if ($null -ne $line) {
-            if ($CaptureOutput) {
-                $outputLines.Add($line)
-            } else {
-                Write-Host $line
-            }
-            if ($line.Contains($Sentinel)) { break }
-        } else {
-            Start-Sleep -Milliseconds 50
-        }
-    }
-
-    if (-not $process.HasExited) {
-        try { $process.Kill() } catch { }
-    }
-    $process.WaitForExit()
-
-    if ($CaptureOutput) { return $outputLines }
-}
+. (Join-Path $PSScriptRoot "wslc-common.ps1")
 
 # Resolve the wslc VM's IP address
 Write-Host "Resolving wslc VM IP address..."
@@ -83,7 +37,7 @@ $vmRelayCmd = "nerdctl rm -f $VmRelayName 2>/dev/null || true; " +
               "nerdctl run -d --name $VmRelayName --network bridge " +
               "-p 0.0.0.0:${VmRelayPort}:${VmRelayPort} alpine/socat " +
               "TCP-LISTEN:${VmRelayPort},fork,reuseaddr TCP:k8s-control-plane:${ListenPort}"
-Invoke-WslcCommand -Command $vmRelayCmd -TimeoutSeconds 60
+Invoke-WslcCommand -Command $vmRelayCmd -TimeoutSeconds 60 -Required
 
 # Stage 2: Host-side wslc container (socat on host, bridges to VM relay)
 Write-Host "Starting host proxy container '$HostProxyName'..."
