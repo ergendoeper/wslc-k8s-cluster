@@ -88,7 +88,7 @@
     {
       "customType": "regex",
       "description": "Track registry Docker image in setup-registry-cache.ps1",
-      "fileMatch": ["^setup-registry-cache\\.ps1$"],
+      "fileMatch": ["^cache/setup-registry-cache\\.ps1$"],
       "matchStrings": [
         "'(?<depName>registry):(?<currentValue>[0-9.]+)'"
       ],

@@ -40,11 +40,11 @@ Dadurch werden Container-Images, APT-Pakete und Binär-Artefakte (`nerdctl`, `cn
 
 | Datei | Zweck |
 |---|---|
-| `setup-registry-cache.ps1` | Einmal-Installer für Windows 11 (erstellt WSL-Distro `k8s-cache`, startet Container, richtet NGINX & apt-cacher-ng ein, konfiguriert Firewall & Portproxy, erzeugt Konfiguration). |
-| `sync-registry-portproxy.ps1` | Startet die Distro bei Bedarf und stellt sicher, dass die Windows `netsh portproxy`-Regeln exakt auf die aktuelle IP von `k8s-cache` zeigen. Wird auch im E2E-Workflow (`run-e2e.bat`) automatisch ausgeführt. |
-| `registry-mirrors.sh` | Gast-seitiges Shell-Modul für die wslc-VM. Konfiguriert `/etc/containerd/certs.d/`, `/etc/hosts` und `/etc/apt/apt.conf.d/01proxy` in Node-Containern. |
-| `hub\index.html` | Dashboard-UI (statisch, lädt alle 15 s `stats.json`). Wird nach `/srv/artifacts/index.html` kopiert. |
-| `hub\hub-stats.py` | Statistik-Dienst (systemd `hub-stats` in der Distro, alle 30 s). Liest Registry-Dateisystem, Docker-Logs, apt-cacher- und nginx-Logs und schreibt `/srv/artifacts/stats.json`. Konfiguration: `/etc/hub-stats.json` (vom Installer erzeugt). |
+| `cache\setup-registry-cache.ps1` | Einmal-Installer für Windows 11 (erstellt WSL-Distro `k8s-cache`, startet Container, richtet NGINX & apt-cacher-ng ein, konfiguriert Firewall & Portproxy, erzeugt Konfiguration). |
+| `cache\sync-registry-portproxy.ps1` | Startet die Distro bei Bedarf und stellt sicher, dass die Windows `netsh portproxy`-Regeln exakt auf die aktuelle IP von `k8s-cache` zeigen. Wird auch im E2E-Workflow (`run-e2e.bat`) automatisch ausgeführt. |
+| `guest\registry-mirrors.sh` | Gast-seitiges Shell-Modul für die wslc-VM. Konfiguriert `/etc/containerd/certs.d/`, `/etc/hosts` und `/etc/apt/apt.conf.d/01proxy` in Node-Containern. |
+| `cache\hub\index.html` | Dashboard-UI (statisch, lädt alle 15 s `stats.json`). Wird nach `/srv/artifacts/index.html` kopiert. |
+| `cache\hub\hub-stats.py` | Statistik-Dienst (systemd `hub-stats` in der Distro, alle 30 s). Liest Registry-Dateisystem, Docker-Logs, apt-cacher- und nginx-Logs und schreibt `/srv/artifacts/stats.json`. Konfiguration: `/etc/hub-stats.json` (vom Installer erzeugt). |
 | `cluster-config.registry.ps1` | Wird vom Installer automatisch generiert (git-ignoriert). Enthält die ermittelten IPs und Port-Zuweisungen. |
 
 ---
@@ -70,23 +70,22 @@ Alle Komponenten dieses Repositories sind **bereits ab Werk vollständig integri
 Führe eine Administrator-PowerShell im Repository-Verzeichnis aus:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\setup-registry-cache.ps1
-```
+powershell -ExecutionPolicy Bypass -File .\cache\setup-registry-cache.ps1```
 
 ### Optionale Parameter
 
 ```powershell
 # Authentifizierten Docker-Hub-Account hinterlegen (verhindert Rate-Limits):
-.\setup-registry-cache.ps1 -DockerHubUser 'meinuser' -DockerHubPassword 'mein-token'
+.\cache\setup-registry-cache.ps1 -DockerHubUser 'meinuser' -DockerHubPassword 'mein-token'
 
 # Versionen der gecachten Artefakte anpassen:
-.\setup-registry-cache.ps1 -NerdctlVersion '1.7.7' `
+.\cache\setup-registry-cache.ps1 -NerdctlVersion '1.7.7' `
                            -CniPluginsVersion 'v1.5.1' `
                            -FlannelVersion 'v0.28.9' `
                            -NvidiaDevicePluginVersion 'v0.15.0'
 
 # Kompletten Cache, Distro, Portproxy und Firewall-Regeln rückstandslos entfernen:
-.\setup-registry-cache.ps1 -Remove
+.\cache\setup-registry-cache.ps1 -Remove
 ```
 
 Das Skript arbeitet **idempotent**: Ein erneuter Aufruf prüft den Zustand und aktualisiert nur geänderte Konfigurationen.
@@ -125,7 +124,7 @@ spec:
 Falls nach einem Windows-Neustart oder Netzwerkwechsel die Verbindung abreißt:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\sync-registry-portproxy.ps1
+powershell -ExecutionPolicy Bypass -File .\cache\sync-registry-portproxy.ps1
 ```
 
 ### 2. Funktionstest aus der wslc-VM

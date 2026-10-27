@@ -19,7 +19,7 @@ echo [E2E] Verwende Konfiguration: %CONFIG%
 echo [E2E] Starting full workflow...
 
 echo [E2E] Step 1/8 - Delete cluster
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\delete-cluster.ps1" -Config "%CONFIG%"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\delete-cluster.ps1" -Config "%CONFIG%"
 if errorlevel 1 goto :fail
 
 echo [E2E] Step 2/8 - Reset wslc session
@@ -30,20 +30,20 @@ if not exist "%ROOT%cluster-config.registry.ps1" (
 
 if exist "%ROOT%cluster-config.registry.ps1" (
     echo [E2E] Step 2b/8 - Ensuring Registry Cache is online
-    powershell -NoProfile -ExecutionPolicy Bypass -File ".\sync-registry-portproxy.ps1"
+    powershell -NoProfile -ExecutionPolicy Bypass -File ".\cache\sync-registry-portproxy.ps1"
     if errorlevel 1 goto :fail
 )
 
 echo [E2E] Step 3/8 - Create cluster
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\create-cluster.ps1" -Config "%CONFIG%"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\create-cluster.ps1" -Config "%CONFIG%"
 if errorlevel 1 goto :fail
 
 echo [E2E] Step 4/8 - Harden cluster
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\harden-cluster.ps1" -Config "%CONFIG%"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\harden-cluster.ps1" -Config "%CONFIG%"
 if errorlevel 1 goto :fail
 
 echo [E2E] Step 5/8 - Update cluster
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\update-cluster.ps1" -Config "%CONFIG%"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\update-cluster.ps1" -Config "%CONFIG%"
 if errorlevel 1 goto :fail
 
 echo [E2E] Step 6/8 - Verify cluster health (control plane + node readiness)
@@ -60,7 +60,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ". '%CONFIG%'; wslc syste
 if errorlevel 1 goto :fail
 
 echo [E2E] Step 7/8 - Setup proxy and verify host kubectl access
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\proxy-port.ps1" -Config "%CONFIG%"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\proxy-port.ps1" -Config "%CONFIG%"
 if errorlevel 1 goto :fail
 
 kubectl get nodes -o wide

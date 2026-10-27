@@ -18,23 +18,28 @@ This repository bootstraps a production-like local multi-node Kubernetes cluster
 
 ## Repository Scripts
 
-| Script | Environment | Description |
-|---|---|---|
-| `cluster-config.ps1` | Host | Central configuration file defining versions, topology, network, GPU, and paths. |
-| `setup-registry-cache.ps1` | Host (Admin) | Sets up the `k8s-cache` WSL distro, pull-through registries, NGINX artifact cache, and firewall/portproxy rules. |
-| `sync-registry-portproxy.ps1` | Host | Synchronizes Windows `netsh portproxy` rules with the dynamic IP of `k8s-cache`. |
-| `wslc-common.ps1` | Host | Shared helpers (`Invoke-WslcCommand` with failure detection, `Send-WslcFile` chunked upload with SHA256 check) dot-sourced by all cluster scripts. |
-| `hub\index.html`, `hub\hub-stats.py` | Cache distro | Hub dashboard UI and the stats service (`hub-stats.service`) that writes `stats.json` (offered images/artifacts and their usage). |
-| `create-cluster.ps1` | Host | Uploads scripts to `wslc`, executes node bootstrap, and exports kubeconfig to `%USERPROFILE%\.kube\config`. |
-| `setup-nodes.sh` | wslc Guest | Main bootstrap script (runtime setup, image pulls, mirror configuration, `kubeadm init`/`join`, Flannel CNI, NVIDIA plugin). |
-| `registry-mirrors.sh` | wslc Guest | Configures containerd `hosts.toml`, `/etc/hosts`, and APT proxy settings inside node containers. |
-| `harden-cluster.ps1` | Host | Uploads and executes `harden-nodes.sh`. |
-| `harden-nodes.sh` | wslc Guest | Applies audit policies and Kubernetes security configurations. |
-| `update-cluster.ps1` | Host | Uploads and executes `update-nodes.sh`. |
-| `update-nodes.sh` | wslc Guest | Performs node package updates (`apt update && apt upgrade`) utilizing `apt-cacher-ng`. |
-| `delete-cluster.ps1` | Host | Gracefully removes cluster containers, networks, and temp data. |
-| `proxy-port.ps1` | Host | Starts a local port proxy forwarding `127.0.0.1:6443` to the internal Kubernetes API server. |
-| `run-e2e.bat` | Host | Complete end-to-end orchestration runner (Delete -> Reset -> Cache Sync -> Create -> Harden -> Update -> Verify). |
+```
+.
+├── cluster-config.ps1        # central configuration (versions, topology, network, GPU, paths)
+├── run-e2e.bat               # end-to-end runner (Delete -> Reset -> Cache Sync -> Create -> Harden -> Update -> Verify)
+├── scripts/                  # host-side cluster lifecycle (PowerShell)
+│   ├── create-cluster.ps1    # uploads guest scripts, bootstraps nodes, exports kubeconfig
+│   ├── harden-cluster.ps1    # uploads and runs guest/harden-nodes.sh
+│   ├── update-cluster.ps1    # uploads and runs guest/update-nodes.sh
+│   ├── delete-cluster.ps1    # removes cluster containers, networks, temp data
+│   ├── proxy-port.ps1        # forwards 127.0.0.1:6443 to the Kubernetes API server
+│   └── lib/wslc-common.ps1   # shared helpers (Invoke-WslcCommand, Send-WslcFile with SHA256 check)
+├── guest/                    # scripts executed inside the wslc VM (bash)
+│   ├── setup-nodes.sh        # runtime setup, image pulls, kubeadm init/join, Flannel CNI, NVIDIA plugin
+│   ├── registry-mirrors.sh   # containerd hosts.toml, /etc/hosts, APT proxy
+│   ├── harden-nodes.sh       # audit policies and security configuration
+│   └── update-nodes.sh       # node package updates via apt-cacher-ng
+├── cache/                    # local registry cache / hub ("k8s-cache" WSL distro)
+│   ├── setup-registry-cache.ps1      # installer (Admin): distro, registries, nginx, firewall/portproxy
+│   ├── sync-registry-portproxy.ps1   # re-syncs netsh portproxy rules with the distro IP
+│   └── hub/                          # dashboard (index.html) and stats service (hub-stats.py)
+└── docs/REGISTRY.md          # registry cache documentation
+```
 
 ---
 
@@ -56,7 +61,7 @@ This repository bootstraps a production-like local multi-node Kubernetes cluster
 Setting up the local registry cache accelerates image pulls and cluster creation significantly:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\setup-registry-cache.ps1
+powershell -ExecutionPolicy Bypass -File .\cache\setup-registry-cache.ps1
 ```
 
 *(See [REGISTRY.md](file:///d:/AI/wslc-k8s-cluster/REGISTRY.md) for full registry documentation, options, and maintenance).*
@@ -75,16 +80,16 @@ Run from the repository root:
 
 ```powershell
 # Step 1: Create the cluster
-.\create-cluster.ps1
+.\scripts\create-cluster.ps1
 
 # Step 2: Apply security hardening
-.\harden-cluster.ps1
+.\scripts\harden-cluster.ps1
 
 # Step 3: Run package updates across all nodes
-.\update-cluster.ps1
+.\scripts\update-cluster.ps1
 
 # Step 4: (Optional) Expose API server to Windows host
-powershell -ExecutionPolicy Bypass -File .\proxy-port.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\proxy-port.ps1
 
 # Step 5: Verify cluster status from host
 kubectl get nodes -o wide
@@ -95,10 +100,10 @@ kubectl get pods -A
 
 ```powershell
 # Remove cluster resources
-.\delete-cluster.ps1
+.\scripts\delete-cluster.ps1
 
 # Remove cluster resources and clear host kubeconfig
-.\delete-cluster.ps1 -RemoveKubeconfig
+.\scripts\delete-cluster.ps1 -RemoveKubeconfig
 ```
 
 ---
@@ -118,7 +123,7 @@ Automated dependency updates are managed via Renovate Bot:
 - Configuration: [`.github/renovate.json`](file:///d:/AI/wslc-k8s-cluster/.github/renovate.json)
 - GitHub Actions Workflow: [`.github/workflows/renovate.yml`](file:///d:/AI/wslc-k8s-cluster/.github/workflows/renovate.yml)
 
-Custom regex managers in Renovate inspect `cluster-config.ps1` and `setup-registry-cache.ps1` to open pull requests whenever new upstream releases or container tags become available.
+Custom regex managers in Renovate inspect `cluster-config.ps1` and `cache/setup-registry-cache.ps1` to open pull requests whenever new upstream releases or container tags become available.
 
 > [!NOTE]
 > `NODE_IMAGE_TAG` specifies the available container image tag of `kindest/node` on Docker Hub, whereas `K8S_VERSION` references upstream Kubernetes releases. Decoupling them allows tracking both independently and prevents build failures when new Kubernetes patch releases are published prior to pre-built `kindest/node` container images on Docker Hub.
@@ -147,7 +152,7 @@ Custom regex managers in Renovate inspect `cluster-config.ps1` and `setup-regist
 ## Troubleshooting
 
 ### 1. Registry Cache connection refused or timeout
-- Run `powershell -ExecutionPolicy Bypass -File .\sync-registry-portproxy.ps1` to re-sync portproxy IP addresses.
+- Run `powershell -ExecutionPolicy Bypass -File .\cache\sync-registry-portproxy.ps1` to re-sync portproxy IP addresses.
 - Verify `wsl -d k8s-cache -- docker ps` shows all registry containers running.
 - Check Windows firewall rule: `Get-NetFirewallRule -DisplayName 'WSLC k8s cache'`.
 

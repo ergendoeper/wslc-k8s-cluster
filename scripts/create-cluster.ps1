@@ -3,7 +3,7 @@
 # Reads cluster topology and settings from a central config file.
 
 param (
-    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
+    [string]$Config = "$PSScriptRoot\..\cluster-config.ps1"
 )
 
 # Load configuration
@@ -20,7 +20,7 @@ if (-not $NODE_IMAGE_TAG) {
 }
 $IMAGE = "${NODE_IMAGE}:${NODE_IMAGE_TAG}"
 
-. (Join-Path $PSScriptRoot "wslc-common.ps1")
+. (Join-Path $PSScriptRoot "lib\wslc-common.ps1")
 
 Write-Host "=== Starting Kubernetes Cluster Setup using wslc ===" -ForegroundColor Green
 Write-Host "  K8S Version    : $K8S_VERSION"
@@ -31,7 +31,7 @@ Write-Host "  Control Plane  : $CONTROL_PLANE_NAME"
 Write-Host "  GPU Support    : $ENABLE_GPU"
 
 # 1. Read setup-nodes.sh and encode to base64
-$setupScriptPath = Join-Path $PSScriptRoot "setup-nodes.sh"
+$setupScriptPath = Join-Path $PSScriptRoot "..\guest\setup-nodes.sh"
 if (-not (Test-Path $setupScriptPath)) {
     Write-Error "setup-nodes.sh not found at $setupScriptPath!"
     exit 1
@@ -43,13 +43,13 @@ Send-WslcFile -LocalPath $setupScriptPath -RemotePath "/tmp/setup-nodes.sh" -Exe
 
 # 2b. Upload registry-mirrors.sh (nur wenn der Cache aktiv ist)
 if ($REGISTRY_ENABLE) {
-    $mirrorScriptPath = Join-Path $PSScriptRoot "registry-mirrors.sh"
+    $mirrorScriptPath = Join-Path $PSScriptRoot "..\guest\registry-mirrors.sh"
     if (Test-Path $mirrorScriptPath) {
         Write-Host "Uploading registry-mirrors.sh to wslc VM..."
         Send-WslcFile -LocalPath $mirrorScriptPath -RemotePath "/tmp/registry-mirrors.sh"
     }
     else {
-        Write-Warning "registry-mirrors.sh nicht gefunden neben create-cluster.ps1 - Registry-Cache wird uebersprungen."
+        Write-Warning "registry-mirrors.sh nicht gefunden unter guest\ - Registry-Cache wird uebersprungen."
         $REGISTRY_ENABLE = $false
     }
 }
@@ -122,6 +122,9 @@ if (Test-Path $kubeConfigPath) {
 
 Write-Host "Writing kubeconfig to $kubeConfigPath..." -ForegroundColor Green
 [System.IO.File]::WriteAllText($kubeConfigPath, $kubeconfigContent)
+
+# The admin credentials must not linger in the VM
+Invoke-WslcCommand -Command "rm -f /tmp/admin.conf" -TimeoutSeconds 30 | Out-Null
 
 Write-Host "=== Cluster Bootstrap Complete! ===" -ForegroundColor Green
 Write-Host "You can now verify the cluster using kubectl."

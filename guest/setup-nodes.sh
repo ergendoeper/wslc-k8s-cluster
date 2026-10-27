@@ -189,7 +189,7 @@ nerdctl run -d --privileged \
   -v /lib/modules:/lib/modules:ro \
   -v "${DATA_DIR}/control-plane:/var/lib/containerd" \
   "${GPU_FLAGS[@]}" \
-  -p 6443:6443 \
+  -p 127.0.0.1:6443:6443 \
   "${IMAGE}"
 
 # Start workers
@@ -441,7 +441,8 @@ if ! wait_for_cluster_ready "600s"; then
   exit 1
 fi
 
-nerdctl exec "$CONTROL_PLANE_NAME" cat /etc/kubernetes/admin.conf > /tmp/admin.conf
+(umask 077; nerdctl exec "$CONTROL_PLANE_NAME" cat /etc/kubernetes/admin.conf > /tmp/admin.conf)
+chmod 600 /tmp/admin.conf
 # Replace the container IP with 127.0.0.1 in the config
 sed -i "s/server: https:\/\/[0-9\.]*:6443/server: https:\/\/127.0.0.1:6443/g" /tmp/admin.conf
 

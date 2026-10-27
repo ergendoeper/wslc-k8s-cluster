@@ -16,10 +16,10 @@
       - meldet den Status
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\sync-registry-portproxy.ps1
+    powershell -ExecutionPolicy Bypass -File .\cache\sync-registry-portproxy.ps1
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\sync-registry-portproxy.ps1 -Verbose
+    powershell -ExecutionPolicy Bypass -File .\cache\sync-registry-portproxy.ps1 -Verbose
 #>
 [CmdletBinding()]
 param(

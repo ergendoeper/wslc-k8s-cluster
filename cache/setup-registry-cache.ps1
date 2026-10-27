@@ -27,10 +27,10 @@
     die Distro selbst.
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\setup-registry-cache.ps1
+    powershell -ExecutionPolicy Bypass -File .\cache\setup-registry-cache.ps1
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\setup-registry-cache.ps1 -SkipArtifacts
+    powershell -ExecutionPolicy Bypass -File .\cache\setup-registry-cache.ps1 -SkipArtifacts
 
 .NOTES
     Muss in einer PowerShell mit Administratorrechten laufen (netsh portproxy + Firewall).
@@ -77,9 +77,10 @@ Set-StrictMode -Version Latest
 # ----------------------------------------------------------------------------
 
 $script:ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$script:RepoRoot   = Split-Path -Parent $script:ScriptRoot
 
 # Falls cluster-config.ps1 existiert, Versionen synchronisieren (sofern nicht explizit per Parameter uebergeben)
-$clusterConfigFile = Join-Path $script:ScriptRoot 'cluster-config.ps1'
+$clusterConfigFile = Join-Path $script:RepoRoot 'cluster-config.ps1'
 if (Test-Path $clusterConfigFile) {
     . $clusterConfigFile
     if (-not $PSBoundParameters.ContainsKey('NerdctlVersion') -and $NERDCTL_VERSION) { $NerdctlVersion = $NERDCTL_VERSION }
@@ -272,7 +273,7 @@ else {
 Rootfs-Download fehlgeschlagen: $($_.Exception.Message)
 
 Abhilfe: Lade ein Ubuntu-WSL-Rootfs manuell herunter und uebergib den lokalen Pfad:
-  .\setup-registry-cache.ps1 -RootfsUrl 'C:\pfad\zu\ubuntu-wsl-rootfs.tar.gz'
+  .\cache\setup-registry-cache.ps1 -RootfsUrl 'C:\pfad\zu\ubuntu-wsl-rootfs.tar.gz'
 "@
             }
         }
@@ -731,7 +732,7 @@ if (-not $registryIp) {
 
 Write-Step '9. cluster-config.registry.ps1 schreiben'
 
-$configPath = Join-Path $script:ScriptRoot 'cluster-config.registry.ps1'
+$configPath = Join-Path $script:RepoRoot 'cluster-config.registry.ps1'
 
 $configContent = @"
 # ============================================================================
@@ -844,7 +845,7 @@ Naechste Schritte:
   1. In cluster-config.ps1 am Ende einfuegen:
          . (Join-Path `$PSScriptRoot 'cluster-config.registry.ps1')
 
-  2. Die Patches aus REGISTRY.md auf setup-nodes.sh und update-nodes.sh anwenden.
+  2. Die Patches aus docs\REGISTRY.md auf guest\setup-nodes.sh und guest\update-nodes.sh anwenden.
      Die hosts.toml MUSS vor 'kubeadm init' geschrieben werden.
 
   3. Eigene Images bauen und pushen:

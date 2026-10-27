@@ -3,7 +3,7 @@
 # Uses Sentinel-based wslc command execution to avoid wslc.exe hanging indefinitely.
 
 param (
-    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
+    [string]$Config = "$PSScriptRoot\..\cluster-config.ps1"
 )
 
 # Load configuration
@@ -20,7 +20,7 @@ $VmRelayPort    = $VM_RELAY_PORT
 $HostProxyName  = $HOST_PROXY_NAME
 $VmRelayName    = $VM_RELAY_NAME
 
-. (Join-Path $PSScriptRoot "wslc-common.ps1")
+. (Join-Path $PSScriptRoot "lib\wslc-common.ps1")
 
 # Resolve the wslc VM's IP address
 Write-Host "Resolving wslc VM IP address..."

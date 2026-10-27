@@ -10,7 +10,7 @@
 #   .\run-e2e.bat .\meine-config.ps1      # nutzt eine eigene Konfigurationsdatei
 #
 #   Einzeln mit PowerShell:
-#   .\create-cluster.ps1 -Config .\meine-config.ps1
+#   .\scripts\create-cluster.ps1 -Config .\meine-config.ps1
 # =============================================================================
 
 

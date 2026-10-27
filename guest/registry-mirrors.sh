@@ -119,7 +119,7 @@ registry_add_hosts_entry() {
 # Kein containerd-Neustart noetig: nerdctl loest hosts.toml clientseitig auf.
 # Deshalb muessen die Pull-Aufrufe in setup-nodes.sh die Option
 #   --hosts-dir=/etc/containerd/certs.d
-# tragen (siehe REGISTRY.md, Patch 2).
+# tragen (siehe docs/REGISTRY.md, Patch 2).
 # ----------------------------------------------------------------------------
 registry_configure_vm() {
     registry_available || return 0

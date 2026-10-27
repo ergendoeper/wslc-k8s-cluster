@@ -4,7 +4,7 @@
 
 param(
     [switch]$RemoveKubeconfig,
-    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
+    [string]$Config = "$PSScriptRoot\..\cluster-config.ps1"
 )
 
 # Load configuration
@@ -14,7 +14,7 @@ if (-not (Test-Path $Config)) {
 }
 . $Config
 
-. (Join-Path $PSScriptRoot "wslc-common.ps1")
+. (Join-Path $PSScriptRoot "lib\wslc-common.ps1")
 
 Write-Host "=== Deleting Kubernetes Cluster Resources in wslc VM ===" -ForegroundColor Yellow
 

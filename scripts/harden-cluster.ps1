@@ -2,7 +2,7 @@
 # Automates the security hardening of the Kubernetes cluster inside the wslc VM.
 
 param (
-    [string]$Config = "$PSScriptRoot\cluster-config.ps1"
+    [string]$Config = "$PSScriptRoot\..\cluster-config.ps1"
 )
 
 # Load configuration
@@ -12,12 +12,12 @@ if (-not (Test-Path $Config)) {
 }
 . $Config
 
-. (Join-Path $PSScriptRoot "wslc-common.ps1")
+. (Join-Path $PSScriptRoot "lib\wslc-common.ps1")
 
 Write-Host "=== Starting Kubernetes Cluster Hardening ===" -ForegroundColor Green
 
 # 1. Read harden-nodes.sh and encode to base64
-$hardenScriptPath = Join-Path $PSScriptRoot "harden-nodes.sh"
+$hardenScriptPath = Join-Path $PSScriptRoot "..\guest\harden-nodes.sh"
 if (-not (Test-Path $hardenScriptPath)) {
     Write-Error "harden-nodes.sh not found at $hardenScriptPath!"
     exit 1

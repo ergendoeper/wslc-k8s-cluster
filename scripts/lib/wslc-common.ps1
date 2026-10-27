@@ -1,6 +1,6 @@
 # wslc-common.ps1
 # Gemeinsame Hilfsfunktionen fuer alle *-cluster.ps1 / proxy-port.ps1 Skripte.
-# Einbinden mit:  . (Join-Path $PSScriptRoot 'wslc-common.ps1')
+# Einbinden mit:  . (Join-Path $PSScriptRoot 'lib\wslc-common.ps1')
 
 # Fuehrt einen Befehl per "bash -c" in der wslc-Session aus und wartet auf eine Sentinel-Zeile
 # (wslc.exe beendet sich bei langlaufenden Sessions nicht von selbst).
