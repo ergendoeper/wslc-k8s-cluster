@@ -215,6 +215,9 @@ registry_configure_apt() {
     [ "$REGISTRY_ENABLE" = "true" ] || return 0
     [ -n "$APT_PROXY" ] || return 0
 
+    # Der Proxy-Name muss aufloesbar sein, bevor apt ihn nutzt (Mirror-Setup laeuft erst spaeter).
+    registry_add_hosts_entry "$node"
+
     nerdctl exec "$node" sh -c "cat > /etc/apt/apt.conf.d/01proxy <<EOF
 Acquire::http::Proxy \"${APT_PROXY}\";
 Acquire::https::Proxy \"${APT_PROXY}\";
