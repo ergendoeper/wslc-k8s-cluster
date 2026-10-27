@@ -68,6 +68,24 @@ function Invoke-WslcCommand {
     }
 }
 
+# Wie Invoke-WslcCommand -Required -CaptureOutput, wiederholt aber bei fehlendem Sentinel.
+function Invoke-WslcWithRetry {
+    param (
+        [Parameter(Mandatory)][string]$Command,
+        [Parameter(Mandatory)][string]$Sentinel,
+        [int]$TimeoutSeconds = 60,
+        [int]$Attempts = 3
+    )
+
+    for ($n = 1; $n -le $Attempts; $n++) {
+        $out = Invoke-WslcCommand -Command $Command -Sentinel $Sentinel -CaptureOutput $true -TimeoutSeconds $TimeoutSeconds
+        if ($global:WslcSentinelSeen) { return $out }
+        Write-Warning "wslc-Befehl ohne Sentinel '$Sentinel' beendet (Versuch $n/$Attempts)."
+        if ($n -lt $Attempts) { Start-Sleep -Seconds (5 * $n) }
+    }
+    throw "wslc-Befehl nicht erfolgreich beendet (Sentinel '$Sentinel' fehlt nach $Attempts Versuchen)."
+}
+
 # Laedt eine lokale Datei in kleinen base64-Bloecken in die wslc-VM (lange Kommandozeilen
 # fuehren zu ERROR_INVALID_HANDLE) und prueft anschliessend die SHA256-Summe.
 function Send-WslcFile {
@@ -83,17 +101,22 @@ function Send-WslcFile {
             [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)) -replace '-', '').ToLower()
 
     $chunkSize = 6000
-    Invoke-WslcCommand -Command "rm -f $RemotePath.b64; : > $RemotePath.b64; echo '=== CHUNK_OK ==='" `
-        -Sentinel "=== CHUNK_OK ===" -CaptureOutput $true -TimeoutSeconds 60 -Required | Out-Null
+    $tmp = "$RemotePath.b64"
+
+    # Der erste Aufruf nach einem Session-Reset startet die VM und kann lange dauern.
+    Invoke-WslcWithRetry -Command "rm -f $tmp; : > $tmp; echo '=== CHUNK_OK ==='" -Sentinel "=== CHUNK_OK ===" -TimeoutSeconds 240 -Attempts 3 | Out-Null
+
     for ($i = 0; $i -lt $b64.Length; $i += $chunkSize) {
         $chunk = $b64.Substring($i, [Math]::Min($chunkSize, $b64.Length - $i))
-        Invoke-WslcCommand -Command "printf '%s' '$chunk' >> $RemotePath.b64 && echo '=== CHUNK_OK ==='" `
-            -Sentinel "=== CHUNK_OK ===" -CaptureOutput $true -TimeoutSeconds 60 -Required | Out-Null
+        $expectedSize = $i + $chunk.Length
+        # Nur anhaengen, wenn die Datei noch die erwartete Laenge vor dem Chunk hat (Wiederholung ohne Duplikate).
+        $cmd = "[ `$(stat -c %s $tmp) -eq $i ] && printf '%s' '$chunk' >> $tmp; [ `$(stat -c %s $tmp) -eq $expectedSize ] && echo '=== CHUNK_OK ==='"
+        Invoke-WslcWithRetry -Command $cmd -Sentinel "=== CHUNK_OK ===" -TimeoutSeconds 60 -Attempts 3 | Out-Null
     }
 
     $chmod = if ($Executable) { "chmod +x $RemotePath && " } else { "" }
-    $lines = Invoke-WslcCommand -Command "base64 -d $RemotePath.b64 > $RemotePath && rm -f $RemotePath.b64 && ${chmod}sha256sum $RemotePath && echo '=== UPLOAD_OK ==='" `
-        -Sentinel "=== UPLOAD_OK ===" -CaptureOutput $true -TimeoutSeconds 60 -Required
+    $lines = Invoke-WslcWithRetry -Command "base64 -d $tmp > $RemotePath && rm -f $tmp && ${chmod}sha256sum $RemotePath && echo '=== UPLOAD_OK ==='" `
+        -Sentinel "=== UPLOAD_OK ===" -TimeoutSeconds 60 -Attempts 2
 
     $remoteHash = ($lines | Where-Object { $_ -match '^[0-9a-f]{64}\s' } | Select-Object -First 1)
     if (-not $remoteHash -or -not $remoteHash.StartsWith($expectedHash)) {
