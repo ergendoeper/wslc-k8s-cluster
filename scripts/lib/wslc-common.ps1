@@ -26,7 +26,7 @@ function Invoke-WslcCommand {
     $processInfo.FileName = "wslc.exe"
     $processInfo.Arguments = "system session run bash -c ""exec 2>&1; $Command"""
     $processInfo.RedirectStandardOutput = $true
-    $processInfo.RedirectStandardError = $false
+    $processInfo.RedirectStandardError = $true
     $processInfo.UseShellExecute = $false
     $processInfo.CreateNoWindow = $true
 
@@ -35,8 +35,15 @@ function Invoke-WslcCommand {
 
     $outputLines = New-Object System.Collections.Generic.List[string]
     $global:WslcSentinelSeen = $false
+    $global:WslcLastDiag = ''
+    $stderrLines = New-Object System.Collections.Concurrent.ConcurrentQueue[string]
+    $errHandler = Register-ObjectEvent -InputObject $process -EventName ErrorDataReceived -MessageData $stderrLines -Action {
+        if ($null -ne $EventArgs.Data) { $Event.MessageData.Enqueue($EventArgs.Data) }
+    }
+    $started = [DateTime]::UtcNow
 
     $process.Start() | Out-Null
+    $process.BeginErrorReadLine()
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 
     while ([DateTime]::UtcNow -lt $deadline) {
@@ -59,6 +66,15 @@ function Invoke-WslcCommand {
     }
     $process.WaitForExit()
 
+    if (-not $global:WslcSentinelSeen) {
+        Start-Sleep -Milliseconds 200
+        $errText = ($stderrLines.ToArray() -join ' | ')
+        $seconds = [Math]::Round(([DateTime]::UtcNow - $started).TotalSeconds, 1)
+        $global:WslcLastDiag = "ExitCode=$($process.ExitCode), Dauer=${seconds}s, stdout-Zeilen=$($outputLines.Count), stderr=[$errText]"
+    }
+    Unregister-Event -SubscriptionId $errHandler.Id -ErrorAction SilentlyContinue
+    Remove-Job -Id $errHandler.Id -Force -ErrorAction SilentlyContinue
+
     if ($Required -and -not $global:WslcSentinelSeen) {
         throw "wslc-Befehl nicht erfolgreich beendet (Sentinel '$Sentinel' fehlt oder Timeout nach ${TimeoutSeconds}s)."
     }
@@ -74,16 +90,16 @@ function Invoke-WslcWithRetry {
         [Parameter(Mandatory)][string]$Command,
         [Parameter(Mandatory)][string]$Sentinel,
         [int]$TimeoutSeconds = 60,
-        [int]$Attempts = 3
+        [int]$Attempts = 5
     )
 
     for ($n = 1; $n -le $Attempts; $n++) {
         $out = Invoke-WslcCommand -Command $Command -Sentinel $Sentinel -CaptureOutput $true -TimeoutSeconds $TimeoutSeconds
         if ($global:WslcSentinelSeen) { return $out }
-        Write-Warning "wslc-Befehl ohne Sentinel '$Sentinel' beendet (Versuch $n/$Attempts)."
+        Write-Warning "wslc-Befehl ohne Sentinel '$Sentinel' beendet (Versuch $n/$Attempts): $($global:WslcLastDiag)"
         if ($n -lt $Attempts) { Start-Sleep -Seconds (5 * $n) }
     }
-    throw "wslc-Befehl nicht erfolgreich beendet (Sentinel '$Sentinel' fehlt nach $Attempts Versuchen)."
+    throw "wslc-Befehl nicht erfolgreich beendet (Sentinel '$Sentinel' fehlt nach $Attempts Versuchen). Letzte Diagnose: $($global:WslcLastDiag)"
 }
 
 # Laedt eine lokale Datei in kleinen base64-Bloecken in die wslc-VM (lange Kommandozeilen
@@ -104,14 +120,14 @@ function Send-WslcFile {
     $tmp = "$RemotePath.b64"
 
     # Der erste Aufruf nach einem Session-Reset startet die VM und kann lange dauern.
-    Invoke-WslcWithRetry -Command "rm -f $tmp; : > $tmp; echo '=== CHUNK_OK ==='" -Sentinel "=== CHUNK_OK ===" -TimeoutSeconds 240 -Attempts 3 | Out-Null
+    Invoke-WslcWithRetry -Command "rm -f $tmp; : > $tmp; echo '=== CHUNK_OK ==='" -Sentinel "=== CHUNK_OK ===" -TimeoutSeconds 240 -Attempts 5 | Out-Null
 
     for ($i = 0; $i -lt $b64.Length; $i += $chunkSize) {
         $chunk = $b64.Substring($i, [Math]::Min($chunkSize, $b64.Length - $i))
         $expectedSize = $i + $chunk.Length
         # Nur anhaengen, wenn die Datei noch die erwartete Laenge vor dem Chunk hat (Wiederholung ohne Duplikate).
         $cmd = "[ `$(stat -c %s $tmp) -eq $i ] && printf '%s' '$chunk' >> $tmp; [ `$(stat -c %s $tmp) -eq $expectedSize ] && echo '=== CHUNK_OK ==='"
-        Invoke-WslcWithRetry -Command $cmd -Sentinel "=== CHUNK_OK ===" -TimeoutSeconds 60 -Attempts 3 | Out-Null
+        Invoke-WslcWithRetry -Command $cmd -Sentinel "=== CHUNK_OK ===" -TimeoutSeconds 60 -Attempts 5 | Out-Null
     }
 
     $chmod = if ($Executable) { "chmod +x $RemotePath && " } else { "" }
