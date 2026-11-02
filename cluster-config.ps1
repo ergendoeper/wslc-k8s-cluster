@@ -18,7 +18,7 @@
 # Kubernetes-Version (Single Source of Truth)
 # Definiert die Ziel-Kubernetes-Version des Clusters.
 # -----------------------------------------------------------------------------
-$K8S_VERSION = "v1.37.1"
+$K8S_VERSION = "v1.37.2"
 $KUBEADM_API_VERSION = "v1beta4"
 $FLANNEL_VERSION = "v0.28.10"
 $FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel3"
