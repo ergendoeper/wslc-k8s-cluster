@@ -23,7 +23,7 @@ $KUBEADM_API_VERSION = "v1beta4"
 $FLANNEL_VERSION = "v0.28.11"
 $FLANNEL_CNI_PLUGIN_VERSION = "v1.9.1-flannel3"
 $CNI_PLUGINS_VERSION = "v1.10.0"
-$NVIDIA_DEVICE_PLUGIN_VERSION = "v0.20.1"
+$NVIDIA_DEVICE_PLUGIN_VERSION = "v0.20.2"
 
 # Wichtiger Hinweis:
 # Diese Werte werden beim Cluster-Setup als Umgebungsvariablen exportiert und
